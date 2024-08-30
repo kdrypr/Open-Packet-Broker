@@ -80,9 +80,11 @@ ens33,0,0,TCP,0,login,0,ens40  # Redirect traffic containing "login"
 4. Logging: All matching and significant events are logged to a file.
 
 ## Contributing
+```
 Contributions are welcome! Please fork the repository, make your changes, and submit a pull request.
+```
 
-## TO DO
+# TO DO
 - [ ] Web UI
 - [ ] Dynamic Rules Management with API
 - [ ] Dynamic Monitoring
