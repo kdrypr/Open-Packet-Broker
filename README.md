@@ -81,3 +81,9 @@ ens33,0,0,TCP,0,login,0,ens40  # Redirect traffic containing "login"
 
 ## Contributing
 Contributions are welcome! Please fork the repository, make your changes, and submit a pull request.
+
+## TO DO
+- [] Web UI
+- [] Dynamic Rules Management with API
+- [] Dynamic Monitoring
+- [] Logging
