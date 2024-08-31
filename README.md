@@ -1,6 +1,6 @@
-# Packet Broker
+# Open Packet Broker
 
-Packet Broker is a software tool designed to capture and redirect network traffic based on user-defined rules. It is useful for network security, traffic analysis, and traffic mirroring between network interfaces.
+Open Packet Broker is a software tool designed to capture and redirect network traffic based on user-defined rules. It is useful for network security, traffic analysis, and traffic mirroring between network interfaces.
 
 ## Features
 
