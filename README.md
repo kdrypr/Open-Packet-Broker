@@ -1,4 +1,7 @@
+
+![OPBLogo-White](https://github.com/user-attachments/assets/373429e8-a9b1-4302-9253-2b51110b0787)
 # Open Packet Broker
+
 
 Open Packet Broker is a software tool designed to capture and redirect network traffic based on user-defined rules. It is useful for network security, traffic analysis, and traffic mirroring between network interfaces.
 
