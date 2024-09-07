@@ -1,5 +1,6 @@
+![OPBLogo](https://github.com/user-attachments/assets/dafa7a9a-b875-4d62-8c70-2fb5424892b2)
 
-![OPBLogo-White](https://github.com/user-attachments/assets/373429e8-a9b1-4302-9253-2b51110b0787)
+
 # Open Packet Broker
 
 
