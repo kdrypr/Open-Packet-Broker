@@ -130,4 +130,4 @@ Contributions are welcome! Please fork the repository, make your changes, and su
 - [ ] Dynamic Rules Management with API
 - [ ] Dynamic Monitoring
 - [ ] Logging
-- [ ] lipcap to DPDK
+- [ ] libcap to DPDK
