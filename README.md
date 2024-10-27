@@ -132,3 +132,4 @@ Contributions are welcome! Please fork the repository, make your changes, and su
 - [ ] Dynamic Monitoring
 - [ ] Logging
 - [ ] libcap to DPDK
+- [ ] Hardware Appliance
