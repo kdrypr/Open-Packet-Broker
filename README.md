@@ -25,6 +25,20 @@ manages the rules, topology and monitoring. It does what a commercial hardware N
 filtering, VLAN manipulation, SPAN mirroring, load balancing, SSL inspection and deduplication —
 on plain Linux or embedded ARM, with no appliance and no vendor lock-in.
 
+## Screenshots
+
+<p align="center">
+  <img src="docs/img/dashboard-dark.png" alt="Dashboard (dark theme)" width="49%" />
+  <img src="docs/img/dashboard-light.png" alt="Dashboard (light theme)" width="49%" />
+</p>
+<p align="center"><sub><b>Dashboard</b> — broker status, CPU/memory, live traffic, per-port stats and recent activity. Dark & light themes.</sub></p>
+
+<p align="center">
+  <img src="docs/img/topology.png" alt="Rules & Topology" width="49%" />
+  <img src="docs/img/new-connection.png" alt="New connection builder" width="49%" />
+</p>
+<p align="center"><sub><b>Rules &amp; Topology</b> — a drag-to-connect 24-port diagram and a rule builder for mirror / SSL-chain / load-balance connections, with live filtering, VLAN and rate-limit options.</sub></p>
+
 ## Architecture
 
 ```
