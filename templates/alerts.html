@@ -1,0 +1,143 @@
+{{template "header" .}}
+
+<div class="page-hdr">
+  <div>
+    <h1 class="page-title">Alerts</h1>
+    <p class="page-sub">Threshold monitoring &amp; webhook notifications</p>
+  </div>
+</div>
+
+{{if .FlashError}}
+<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>
+{{end}}
+{{if .FlashSuccess}}
+<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>
+{{end}}
+
+{{if .IsAdmin}}
+<div class="card">
+  <div class="card-header"><span class="card-title">Create Alert Rule</span></div>
+  <div class="card-body">
+    <form action="/alerts" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:800px">
+        <div class="form-group">
+          <label class="form-label">Name *</label>
+          <input class="form-control" name="name" required placeholder="High drop rate">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Metric</label>
+          <select class="form-control" name="metric">
+            <option value="drop_rate">Drop Rate (%)</option>
+            <option value="rx_errors">RX Errors</option>
+            <option value="link_down">Link Down</option>
+            <option value="cpu">CPU Usage (%)</option>
+            <option value="memory">Memory Usage (%)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Operator</label>
+          <select class="form-control" name="operator">
+            <option value=">">&gt; Greater than</option>
+            <option value="<">&lt; Less than</option>
+            <option value="=">=  Equal to</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Threshold</label>
+          <input class="form-control" name="threshold" type="number" step="0.01" value="5" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Interface (optional)</label>
+          <input class="form-control" name="interface" placeholder="eth0 or empty=all">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Webhook URL</label>
+          <input class="form-control" name="webhook_url" placeholder="https://...">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button type="submit" class="btn btn-primary">Create Alert</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{end}}
+
+<!-- Alert Rules -->
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Alert Rules{{if .AlertRules}} <span style="font-weight:400;color:var(--text-muted)">({{len .AlertRules}})</span>{{end}}</span></div>
+  {{if .AlertRules}}
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr><th>Name</th><th>Metric</th><th>Condition</th><th>Interface</th><th>Status</th><th>Last Triggered</th>{{if .IsAdmin}}<th>Actions</th>{{end}}</tr></thead>
+      <tbody>
+        {{range .AlertRules}}
+        <tr{{if not .Enabled}} style="opacity:0.45"{{end}}>
+          <td style="font-weight:500">{{.Name}}</td>
+          <td><span class="badge badge-INFO">{{.Metric}}</span></td>
+          <td class="mono">{{.Operator}} {{.Threshold}}</td>
+          <td class="mono">{{if .Interface}}{{.Interface}}{{else}}<span style="color:var(--text-muted)">all</span>{{end}}</td>
+          <td>
+            {{if .Enabled}}<span class="badge" style="background:var(--success-dim);color:var(--success)">ON</span>
+            {{else}}<span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">OFF</span>{{end}}
+          </td>
+          <td style="font-size:11px;color:var(--text-muted)">{{if .LastTriggered}}{{.LastTriggered}}{{else}}Never{{end}}</td>
+          {{if $.IsAdmin}}
+          <td style="display:flex;gap:4px">
+            <form action="/alerts/{{.ID}}/toggle" method="post" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button class="btn btn-ghost btn-sm">{{if .Enabled}}Disable{{else}}Enable{{end}}</button>
+            </form>
+            <form action="/alerts/{{.ID}}/delete" method="post" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="empty"><div class="empty-txt" style="padding:32px">No alert rules configured.</div></div>
+  {{end}}
+</div>
+
+<!-- Recent Events -->
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Recent Events{{if .AlertEvents}} <span style="font-weight:400;color:var(--text-muted)">({{len .AlertEvents}})</span>{{end}}</span></div>
+  {{if .AlertEvents}}
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr><th>Time</th><th>Alert</th><th>Message</th><th>Status</th><th>Action</th></tr></thead>
+      <tbody>
+        {{range .AlertEvents}}
+        <tr>
+          <td style="font-size:11px;color:var(--text-muted);white-space:nowrap">{{.Timestamp}}</td>
+          <td style="font-weight:500">{{.RuleName}}</td>
+          <td class="mono" style="font-size:11px">{{.Message}}</td>
+          <td>
+            {{if .Acknowledged}}<span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">ACK</span>
+            {{else}}<span class="badge badge-WARNING">NEW</span>{{end}}
+          </td>
+          <td>
+            {{if not .Acknowledged}}
+            <form action="/alerts/{{.ID}}/acknowledge" method="post" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button class="btn btn-ghost btn-sm">Acknowledge</button>
+            </form>
+            {{end}}
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="empty"><div class="empty-txt" style="padding:32px">No alert events yet.</div></div>
+  {{end}}
+</div>
+
+{{template "footer" .}}

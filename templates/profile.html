@@ -1,0 +1,126 @@
+{{template "header" .}}
+
+<div class="page-hdr">
+  <div>
+    <h1 class="page-title">Profile</h1>
+    <p class="page-sub">Manage your account settings</p>
+  </div>
+</div>
+
+{{if .FlashError}}
+<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:#f85149">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+    <circle cx="12" cy="12" r="10"/>
+    <line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+  </svg>
+  <span>{{.FlashError}}</span>
+</div>
+{{end}}
+
+{{if .FlashSuccess}}
+<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:#3fb950">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+    <polyline points="22 4 12 14.01 9 11.01"/>
+  </svg>
+  <span>{{.FlashSuccess}}</span>
+</div>
+{{end}}
+
+<!-- Account info -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Account</span>
+  </div>
+  <div class="card-body">
+    <div style="display:flex;align-items:center;gap:16px">
+      <div style="width:48px;height:48px;border-radius:50%;background:var(--surface-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+          <circle cx="12" cy="7" r="4"/>
+        </svg>
+      </div>
+      <div>
+        <div style="font-size:16px;font-weight:600;color:var(--text)">{{.Username}}</div>
+        <div style="margin-top:4px">
+          {{if eq .UserRole "admin"}}
+          <span class="badge" style="background:var(--primary-dim);color:var(--primary);border:1px solid rgba(88,166,255,.2)">Admin</span>
+          {{else}}
+          <span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">User</span>
+          {{end}}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Change password -->
+<div class="card mt-12">
+  <div class="card-header">
+    <span class="card-title">Change Password</span>
+  </div>
+  <div class="card-body">
+    <form action="/profile/password" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:600px">
+        <div class="form-group">
+          <label class="form-label" for="current_password">Current Password</label>
+          <input class="form-control" type="password" id="current_password"
+                 name="current_password" required autocomplete="current-password">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="new_password">New Password</label>
+          <input class="form-control" type="password" id="new_password"
+                 name="new_password" required autocomplete="new-password" minlength="8">
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="confirm_password">Confirm Password</label>
+          <input class="form-control" type="password" id="confirm_password"
+                 name="confirm_password" required autocomplete="new-password" minlength="8">
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button type="submit" class="btn btn-primary">Update Password</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- 2FA -->
+<div class="card mt-12">
+  <div class="card-header">
+    <span class="card-title">Two-Factor Authentication</span>
+    {{if .TOTPEnabled}}<span class="badge" style="background:var(--success-dim);color:var(--success)">ENABLED</span>
+    {{else}}<span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">DISABLED</span>{{end}}
+  </div>
+  <div class="card-body">
+    {{if .TOTPEnabled}}
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:12px">Two-factor authentication is active on your account.</p>
+    <form action="/profile/totp/disable" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <button type="submit" class="btn btn-danger" onclick="return confirm('Disable 2FA?')">Disable 2FA</button>
+    </form>
+    {{else}}
+    <p style="font-size:13px;color:var(--text-2);margin-bottom:14px">Scan this secret with Google Authenticator or Authy, then enter the 6-digit code to verify.</p>
+    {{if .TOTPSecret}}
+    <div style="background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;margin-bottom:14px;max-width:400px">
+      <div style="font-size:11px;color:var(--text-muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.05em;font-weight:600">Secret Key (manual entry)</div>
+      <div class="mono" style="font-size:13px;word-break:break-all;letter-spacing:.1em">{{.TOTPSecret}}</div>
+    </div>
+    {{end}}
+    <form action="/profile/totp/verify" method="post" style="display:flex;gap:8px;align-items:flex-end;max-width:300px">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">6-Digit Code</label>
+        <input class="form-control" name="totp_code" placeholder="000000" required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" style="letter-spacing:.2em;font-size:16px;text-align:center">
+      </div>
+      <button type="submit" class="btn btn-primary" style="margin-bottom:0">Verify &amp; Enable</button>
+    </form>
+    {{end}}
+  </div>
+</div>
+
+{{template "footer" .}}

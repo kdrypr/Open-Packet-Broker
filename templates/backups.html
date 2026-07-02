@@ -1,0 +1,91 @@
+{{template "header" .}}
+
+<div class="page-hdr">
+  <div>
+    <h1 class="page-title">Configuration Backups</h1>
+    <p class="page-sub">Export, import &amp; restore configurations</p>
+  </div>
+</div>
+
+{{if .FlashError}}
+<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>
+{{end}}
+{{if .FlashSuccess}}
+<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>
+{{end}}
+
+<!-- Create & Import -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+  <div class="card">
+    <div class="card-header"><span class="card-title">Create Backup</span></div>
+    <div class="card-body">
+      <form action="/backups" method="post">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Description</label>
+          <input class="form-control" name="description" placeholder="Before upgrade...">
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Create Backup</button>
+      </form>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header"><span class="card-title">Import Backup</span></div>
+    <div class="card-body">
+      <form action="/backups/import" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <div class="form-group" style="margin-bottom:8px">
+          <label class="form-label">ZIP File</label>
+          <input class="form-control" type="file" name="file" accept=".zip" required>
+        </div>
+        <div class="form-group" style="margin-bottom:12px">
+          <label class="form-label">Description</label>
+          <input class="form-control" name="description" placeholder="Imported from...">
+        </div>
+        <button type="submit" class="btn btn-ghost btn-sm">Import</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Backup List -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Backup History{{if .Backups}} <span style="font-weight:400;color:var(--text-muted)">({{len .Backups}})</span>{{end}}</span></div>
+  {{if .Backups}}
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Description</th><th>Type</th><th>Size</th><th>Created</th><th>Actions</th></tr></thead>
+      <tbody>
+        {{range .Backups}}
+        <tr>
+          <td style="color:var(--text-muted);font-size:11px">{{.ID}}</td>
+          <td>{{.Description}}</td>
+          <td>
+            {{if .AutoBackup}}<span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">Auto</span>
+            {{else}}<span class="badge badge-INFO">Manual</span>{{end}}
+          </td>
+          <td class="mono" style="font-size:11px">{{.Size}} B</td>
+          <td style="font-size:11px;color:var(--text-muted)">{{.Created}}</td>
+          <td style="display:flex;gap:4px">
+            <a href="/backups/{{.ID}}/download" class="btn btn-ghost btn-sm">Download</a>
+            <form action="/backups/{{.ID}}/restore" method="post" style="display:inline"
+                  onsubmit="return confirm('Restore this backup? Current config will be overwritten.')">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button class="btn btn-primary btn-sm">Restore</button>
+            </form>
+            <form action="/backups/{{.ID}}/delete" method="post" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="empty"><div class="empty-txt" style="padding:32px">No backups yet. Create one to get started.</div></div>
+  {{end}}
+</div>
+
+{{template "footer" .}}

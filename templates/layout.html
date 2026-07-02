@@ -1,0 +1,735 @@
+{{define "header"}}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{{.ProductName}}</title>
+  <style>
+    :root {
+      --bg:           #0d1117;
+      --surface:      #161b22;
+      --surface-2:    #1c2128;
+      --border:       #30363d;
+      --border-light: #21262d;
+      --primary:      #58a6ff;
+      --primary-dim:  rgba(88,166,255,0.12);
+      --success:      #3fb950;
+      --success-dim:  rgba(63,185,80,0.12);
+      --danger:       #f85149;
+      --danger-dim:   rgba(248,81,73,0.12);
+      --warning:      #d29922;
+      --warning-dim:  rgba(210,153,34,0.12);
+      --text:         #e6edf3;
+      --text-2:       #c9d1d9;
+      --text-muted:   #8b949e;
+      --font:         -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      --mono:         'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+      --radius:       8px;
+      --radius-sm:    6px;
+      --sidebar-w:    220px;
+    }
+    /* ── Light theme override ──────────────────── */
+    [data-theme="light"] {
+      --bg:           #f6f8fa;
+      --surface:      #ffffff;
+      --surface-2:    #f0f2f5;
+      --border:       #d0d7de;
+      --border-light: #e1e4e8;
+      --primary:      #0969da;
+      --primary-dim:  rgba(9,105,218,0.1);
+      --success:      #1a7f37;
+      --success-dim:  rgba(26,127,55,0.1);
+      --danger:       #cf222e;
+      --danger-dim:   rgba(207,34,46,0.1);
+      --warning:      #9a6700;
+      --warning-dim:  rgba(154,103,0,0.1);
+      --text:         #1f2328;
+      --text-2:       #31363b;
+      --text-muted:   #656d76;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 14px; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.5; }
+    a { color: var(--primary); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* ── App shell: sidebar + content ──────────── */
+    .app-shell { display: flex; min-height: 100vh; }
+
+    /* ── Sidebar ───────────────────────────────── */
+    .sidebar {
+      width: var(--sidebar-w); flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      position: fixed; top: 0; left: 0; bottom: 0;
+      overflow-y: auto; overflow-x: hidden;
+      z-index: 200;
+      transition: transform .2s ease;
+    }
+    .sidebar-brand {
+      padding: 16px 16px 14px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 9px;
+      font-weight: 700; font-size: 14px; color: var(--text);
+      text-decoration: none; flex-shrink: 0;
+    }
+    .sidebar-brand:hover { text-decoration: none; color: var(--text); }
+    .sidebar-brand svg { color: var(--primary); flex-shrink: 0; }
+
+    .sidebar-status {
+      padding: 10px 16px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .status-pill {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: 10px; font-weight: 700;
+      letter-spacing: .04em; text-transform: uppercase;
+    }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+    .pill-running { background: var(--success-dim); color: var(--success); border: 1px solid rgba(63,185,80,.25); }
+    .pill-running .status-dot { background: var(--success); box-shadow: 0 0 4px var(--success); animation: blink 2s infinite; }
+    .pill-stopped { background: var(--danger-dim); color: var(--danger); border: 1px solid rgba(248,81,73,.25); }
+    .pill-stopped .status-dot { background: var(--danger); }
+    @keyframes blink { 0%,100% { opacity:1; } 50% { opacity:.4; } }
+
+    .sidebar-nav { flex: 1; padding: 8px 0; overflow-y: auto; }
+
+    .nav-group { margin-bottom: 4px; }
+    .nav-group-label {
+      padding: 8px 16px 4px;
+      font-size: 10px; font-weight: 700; color: var(--text-muted);
+      text-transform: uppercase; letter-spacing: .08em;
+      user-select: none;
+    }
+    .nav-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 6px 16px; margin: 1px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500;
+      color: var(--text-muted); text-decoration: none;
+      transition: all .12s;
+    }
+    .nav-item:hover { color: var(--text); background: rgba(255,255,255,.06); text-decoration: none; }
+    .nav-item.active { color: var(--text); background: rgba(255,255,255,.08); }
+    .nav-item.active .nav-icon { color: var(--primary); }
+    .nav-icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--text-muted); opacity: .65; }
+    .nav-item:hover .nav-icon { opacity: 1; }
+    .nav-item.active .nav-icon { opacity: 1; }
+    .nav-badge {
+      margin-left: auto;
+      background: var(--danger); color: #fff;
+      font-size: 9px; font-weight: 700; padding: 1px 6px;
+      border-radius: 20px; line-height: 1.4;
+    }
+
+    .sidebar-user {
+      padding: 12px 16px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .sidebar-avatar {
+      width: 30px; height: 30px; border-radius: 50%;
+      background: var(--surface-2); border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .sidebar-user-info { flex: 1; min-width: 0; }
+    .sidebar-user-name { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-user-role { font-size: 10px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .04em; }
+    .sidebar-signout {
+      font-size: 11px; color: var(--text-muted); text-decoration: none;
+      padding: 4px 8px; border-radius: var(--radius-sm);
+      transition: all .12s;
+    }
+    .sidebar-signout:hover { color: var(--danger); background: var(--danger-dim); text-decoration: none; }
+
+    /* ── Main content area ─────────────────────── */
+    .main-content {
+      flex: 1; margin-left: var(--sidebar-w);
+      min-height: 100vh;
+    }
+    .container { max-width: 1200px; margin: 0 auto; padding: 24px 24px; }
+
+    /* ── Mobile toggle ─────────────────────────── */
+    .sidebar-toggle {
+      display: none; position: fixed; top: 10px; left: 10px;
+      z-index: 300; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); padding: 8px 10px;
+      color: var(--text); cursor: pointer; line-height: 1;
+    }
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar-toggle { display: block; }
+      .main-content { margin-left: 0; }
+      .container { padding: 16px 12px; padding-top: 50px; }
+    }
+
+    /* ── Page header ─────────────────────────────── */
+    .page-hdr { margin-bottom: 20px; display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+    .page-title { font-size: 20px; font-weight: 700; line-height: 1.2; }
+    .page-sub { font-size: 12px; color: var(--text-muted); margin-top: 3px; }
+
+    /* ── Cards ───────────────────────────────────── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .card-body { padding: 18px 20px; }
+    .card-header {
+      padding: 12px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    }
+    .card-title { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .06em; }
+    .card + .card { margin-top: 14px; }
+
+    /* ── Stats row ───────────────────────────────── */
+    .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; }
+    .stat-val { font-size: 26px; font-weight: 700; line-height: 1; margin-bottom: 5px; }
+    .stat-lbl { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+
+    /* ── Buttons ─────────────────────────────────── */
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 7px 14px; border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500; cursor: pointer;
+      border: 1px solid transparent; text-decoration: none;
+      transition: all .15s; white-space: nowrap; line-height: 1; font-family: var(--font);
+    }
+    .btn:hover { text-decoration: none; }
+    .btn:disabled { opacity: .4; cursor: not-allowed; pointer-events: none; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+    .btn-primary { background: var(--primary); color: #0d1117; }
+    .btn-primary:hover { background: #79b8ff; color: #0d1117; }
+    .btn-success { background: var(--success); color: #0d1117; }
+    .btn-success:hover { background: #56d364; color: #0d1117; }
+    .btn-danger { background: transparent; color: var(--danger); border-color: rgba(248,81,73,.35); }
+    .btn-danger:hover { background: var(--danger-dim); border-color: var(--danger); }
+    .btn-ghost { background: transparent; color: var(--text-muted); border-color: var(--border); }
+    .btn-ghost:hover { color: var(--text); background: rgba(255,255,255,.05); }
+
+    /* ── Forms ───────────────────────────────────── */
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-label { font-size: 11px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+    .form-control {
+      background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm);
+      color: var(--text); font-size: 13px; font-family: var(--font);
+      padding: 7px 10px; outline: none; width: 100%;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(88,166,255,.1); }
+    .form-control::placeholder { color: var(--text-muted); }
+
+    /* ── Table ───────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    .tbl { width: 100%; border-collapse: collapse; }
+    .tbl thead th {
+      background: var(--surface-2); color: var(--text-muted);
+      font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em;
+      padding: 9px 14px; text-align: left; border-bottom: 1px solid var(--border); white-space: nowrap;
+    }
+    .tbl tbody tr { border-bottom: 1px solid var(--border-light); transition: background .1s; }
+    .tbl tbody tr:last-child { border-bottom: none; }
+    .tbl tbody tr:hover { background: rgba(255,255,255,.025); }
+    .tbl tbody td { padding: 10px 14px; color: var(--text-2); font-size: 13px; }
+    .tbl td.mono { font-family: var(--mono); font-size: 12px; }
+
+    /* ── Badges ──────────────────────────────────── */
+    .badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+    .badge-INFO    { background: var(--primary-dim); color: var(--primary); }
+    .badge-ERROR   { background: var(--danger-dim);  color: var(--danger);  }
+    .badge-WARNING, .badge-WARN { background: var(--warning-dim); color: var(--warning); }
+    .badge-DEBUG   { background: rgba(255,255,255,.07); color: var(--text-muted); }
+    .badge-default { background: rgba(255,255,255,.07); color: var(--text-muted); }
+
+    /* ── Pagination ──────────────────────────────── */
+    .pager { display: flex; align-items: center; gap: 5px; margin-top: 14px; flex-wrap: wrap; }
+    .pager-info { font-size: 12px; color: var(--text-muted); margin-right: 6px; }
+    .pager-spacer { flex: 1; }
+    .pager-pp { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+    .pager-select { background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 12px; padding: 4px 6px; outline: none; cursor: pointer; }
+    .pg {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 30px; height: 30px; padding: 0 6px; border-radius: var(--radius-sm);
+      border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+      font-size: 12px; text-decoration: none; cursor: pointer; transition: all .15s; font-family: var(--font);
+    }
+    .pg:hover { background: rgba(255,255,255,.06); color: var(--text); border-color: #484f58; text-decoration: none; }
+    .pg.on  { background: var(--primary); color: #0d1117; border-color: var(--primary); font-weight: 700; }
+    .pg.off { opacity: .35; pointer-events: none; }
+
+    /* ── Toolbar/Search ─────────────────────────── */
+    .toolbar { display: flex; gap: 8px; margin-bottom: 12px; align-items: center; flex-wrap: wrap; }
+    .search-wrap { position: relative; flex: 1; min-width: 180px; max-width: 320px; }
+    .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-muted); pointer-events: none; }
+    .search-input {
+      width: 100%; background: var(--bg); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); color: var(--text); font-size: 13px;
+      padding: 7px 10px 7px 30px; outline: none; transition: border-color .15s;
+    }
+    .search-input:focus { border-color: var(--primary); }
+    .search-input::placeholder { color: var(--text-muted); }
+
+    /* ── Log lines ───────────────────────────────── */
+    .log-ts { color: var(--text-muted); white-space: nowrap; font-family: var(--mono); font-size: 11px; }
+    .log-msg { font-family: var(--mono); font-size: 12px; word-break: break-word; line-height: 1.5; }
+    .log-ERROR   .log-msg { color: var(--danger); }
+    .log-WARNING .log-msg, .log-WARN .log-msg { color: var(--warning); }
+    .log-DEBUG   .log-msg { color: var(--text-muted); }
+
+    /* ── Misc ────────────────────────────────────── */
+    .empty { text-align: center; padding: 40px 20px; color: var(--text-muted); }
+    .empty-ico { font-size: 28px; margin-bottom: 10px; opacity: .35; }
+    .empty-txt { font-size: 13px; }
+    .flex { display: flex; }
+    .gap-8 { gap: 8px; }
+    .mt-12 { margin-top: 12px; }
+    .hidden { display: none !important; }
+    .nav-spacer { flex: 1; }
+    .section-sep { margin:22px 0 18px;border:0;border-top:1px solid var(--border-light); }
+
+    @media (max-width: 600px) {
+      .container { padding: 14px 12px; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .form-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="app-shell">
+
+<!-- Mobile toggle -->
+<button class="sidebar-toggle" onclick="document.querySelector('.sidebar').classList.toggle('open')">
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+</button>
+
+<!-- ── Sidebar ──────────────────────────────────── -->
+<aside class="sidebar">
+
+  <a class="sidebar-brand" href="/">
+    {{if .LogoURL}}
+    <img src="{{.LogoURL}}" alt="" style="width:18px;height:18px;object-fit:contain;flex-shrink:0">
+    {{else}}
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+         stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+    </svg>
+    {{end}}
+    {{.ProductName}}
+  </a>
+
+  <div class="sidebar-status">
+    <span class="status-pill pill-{{.Status}}">
+      <span class="status-dot"></span>
+      {{.Status}}
+    </span>
+    {{if .DPMode}}<span style="margin-left:6px;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:2px 6px;border-radius:6px;background:{{if eq .DPMode "afxdp"}}rgba(63,185,80,.12);color:#3fb950;border:1px solid rgba(63,185,80,.3){{else}}rgba(110,118,129,.15);color:var(--text-muted);border:1px solid var(--border){{end}}" title="Data plane backend (set via BROKER_MODE env)">{{.DPMode}}</span>{{end}}
+  </div>
+  {{if .MgmtIfaces}}
+  <div style="padding:4px 14px 8px;font-size:10px;color:var(--text-muted);line-height:1.4" title="Auto-detected; excluded from data-plane selectors">
+    <span style="display:inline-block;padding:1px 5px;border-radius:4px;background:rgba(247,166,73,.12);color:#f7a649;font-size:9px;font-weight:700;letter-spacing:.04em">MGMT</span>
+    {{range $i, $n := .MgmtIfaces}}{{if $i}}, {{end}}{{$n}}{{end}}
+  </div>
+  {{end}}
+
+  <nav class="sidebar-nav">
+
+    <!-- ── Operations ── -->
+    <div class="nav-group">
+      <div class="nav-group-label">{{t .Lang "nav.operations"}}</div>
+      <a href="/" class="nav-item {{if eq .ActivePage "index"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        {{t .Lang "nav.dashboard"}}
+      </a>
+      <a href="/rules" class="nav-item {{if eq .ActivePage "rules"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        {{t .Lang "nav.rules"}}
+      </a>
+      <a href="/logs" class="nav-item {{if eq .ActivePage "logs"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+        {{t .Lang "nav.logs"}}
+      </a>
+      <a href="/captures" class="nav-item {{if eq .ActivePage "captures"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+        {{t .Lang "nav.captures"}}
+      </a>
+    </div>
+
+    {{if .IsAdmin}}
+    <!-- ── Network ── -->
+    <div class="nav-group">
+      <div class="nav-group-label">{{t .Lang "nav.network"}}</div>
+      <a href="/mirror" class="nav-item {{if eq .ActivePage "mirror"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="7 8 3 12 7 16"/><line x1="21" y1="12" x2="3" y2="12"/></svg>
+        {{t .Lang "nav.mirror"}}
+      </a>
+      <a href="/load-balance" class="nav-item {{if eq .ActivePage "loadbalance"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>
+        {{t .Lang "nav.loadbalance"}}
+      </a>
+      <a href="/throttle" class="nav-item {{if eq .ActivePage "throttle"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+        {{t .Lang "nav.throttle"}}
+      </a>
+      <a href="/dedup" class="nav-item {{if eq .ActivePage "dedup"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="12" y1="6" x2="12" y2="18"/></svg>
+        {{t .Lang "nav.dedup"}}
+      </a>
+      <a href="/ssl-decrypt" class="nav-item {{if eq .ActivePage "ssldecrypt"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        {{t .Lang "nav.ssl"}}
+      </a>
+      <a href="/dpi" class="nav-item {{if eq .ActivePage "dpi"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        {{t .Lang "nav.dpi"}}
+      </a>
+      <a href="/masking" class="nav-item {{if eq .ActivePage "masking"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        {{t .Lang "nav.masking"}}
+      </a>
+    </div>
+
+    <!-- ── Monitoring ── -->
+    <div class="nav-group">
+      <div class="nav-group-label">{{t .Lang "nav.monitoring"}}</div>
+      <a href="/alerts" class="nav-item {{if eq .ActivePage "alerts"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        {{t .Lang "nav.alerts"}}
+        {{if .UnackedAlerts}}<span class="nav-badge">{{.UnackedAlerts}}</span>{{end}}
+      </a>
+      <a href="/health-checks" class="nav-item {{if eq .ActivePage "healthcheck"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        {{t .Lang "nav.healthchecks"}}
+      </a>
+    </div>
+
+    <!-- ── System ── -->
+    <div class="nav-group">
+      <div class="nav-group-label">{{t .Lang "nav.system"}}</div>
+      <a href="/cluster" class="nav-item {{if eq .ActivePage "cluster"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg>
+        {{t .Lang "nav.cluster"}}
+      </a>
+      <a href="/backups" class="nav-item {{if eq .ActivePage "backups"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        {{t .Lang "nav.backups"}}
+      </a>
+      <a href="/admin/firmware" class="nav-item {{if eq .ActivePage "firmware"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><circle cx="6" cy="6" r="1"/><circle cx="6" cy="18" r="1"/></svg>
+        {{t .Lang "nav.firmware"}}
+      </a>
+      <a href="/admin/snmp" class="nav-item {{if eq .ActivePage "snmp"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 8.5L9 12l-3.5 3.5L2 12l3.5-3.5z"/><path d="M12 2l3.5 3.5L12 9 8.5 5.5 12 2z"/><path d="M18.5 8.5L22 12l-3.5 3.5L15 12l3.5-3.5z"/><path d="M12 15l3.5 3.5L12 22l-3.5-3.5L12 15z"/></svg>
+        {{t .Lang "nav.snmp"}}
+      </a>
+      <a href="/admin/audit" class="nav-item {{if eq .ActivePage "audit"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+        {{t .Lang "nav.audit"}}
+      </a>
+      <a href="/admin/license" class="nav-item {{if eq .ActivePage "license"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"/></svg>
+        {{t .Lang "nav.license"}}
+      </a>
+      <a href="/admin/mail" class="nav-item {{if eq .ActivePage "mail"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        {{t .Lang "nav.email"}}
+      </a>
+      <a href="/admin/syslog" class="nav-item {{if eq .ActivePage "syslog"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2L11 13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        {{t .Lang "nav.siem"}}
+      </a>
+      <a href="/admin/users" class="nav-item {{if eq .ActivePage "users"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        {{t .Lang "nav.users"}}
+      </a>
+      <a href="/admin/settings" class="nav-item {{if eq .ActivePage "settings"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        Settings
+      </a>
+    </div>
+    {{end}}
+
+    <div class="nav-group">
+      <a href="/admin/guide" class="nav-item {{if eq .ActivePage "guide"}}active{{end}}">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        Guide
+      </a>
+    </div>
+
+  </nav>
+
+  <!-- ── User footer ── -->
+  {{if .Username}}
+  <div class="sidebar-user">
+    <a href="/profile" class="sidebar-avatar" title="Profile">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+      </svg>
+    </a>
+    <div class="sidebar-user-info">
+      <div class="sidebar-user-name">{{.Username}}</div>
+      <div class="sidebar-user-role">{{.UserRole}}</div>
+    </div>
+    <form action="/set-lang" method="post" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="hidden" name="lang" value="{{if eq .Lang "en"}}tr{{else}}en{{end}}">
+      <button type="submit" class="sidebar-signout" title="{{if eq .Lang "en"}}Turkce{{else}}English{{end}}" style="border:none;cursor:pointer;background:none;font-size:11px;font-weight:700;color:var(--text-muted);letter-spacing:.03em">
+        {{if eq .Lang "en"}}TR{{else}}EN{{end}}
+      </button>
+    </form>
+    <button class="sidebar-signout" title="Toggle theme" onclick="toggleTheme()" style="border:none;cursor:pointer;background:none">
+      <svg id="themeIcon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/>
+        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+        <line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/>
+        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+      </svg>
+    </button>
+    <a href="/logout" class="sidebar-signout" title="Sign out">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+    </a>
+  </div>
+  {{end}}
+
+</aside>
+
+<!-- ── Main content ─────────────────────────────── -->
+<div class="main-content">
+<div class="container">
+{{end}}
+
+
+{{define "footer"}}
+</div>
+</div>
+</div>
+
+<!-- ═══ Help button (bottom-right) ═══ -->
+<button id="helpBtn" onclick="toggleHelp()" style="
+  position:fixed;bottom:20px;right:20px;z-index:500;
+  width:44px;height:44px;border-radius:50%;border:1px solid var(--border);
+  background:var(--surface);color:var(--primary);cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 16px rgba(0,0,0,.25);transition:all .15s;
+" title="Help">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+</button>
+
+<!-- ═══ Help panel ═══ -->
+<div id="helpPanel" style="
+  position:fixed;bottom:76px;right:20px;z-index:500;
+  width:340px;max-height:70vh;overflow-y:auto;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:0 12px 40px rgba(0,0,0,.35);display:none;
+  font-size:13px;color:var(--text-2);line-height:1.6;
+">
+  <div style="padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between">
+    <span style="font-weight:700;font-size:14px;color:var(--text)">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      Page Help
+    </span>
+    <button onclick="toggleHelp()" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:18px;line-height:1">&times;</button>
+  </div>
+  <div id="helpContent" style="padding:14px 16px"></div>
+  <div style="padding:10px 16px;border-top:1px solid var(--border);font-size:11px;color:var(--text-muted)">
+    <button onclick="startTour()" style="background:none;border:none;color:var(--primary);cursor:pointer;font-size:11px;font-weight:600">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px;margin-right:3px"><polygon points="5,3 19,12 5,21"/></svg>
+      Start onboarding tour
+    </button>
+  </div>
+</div>
+
+<!-- ═══ Onboarding overlay ═══ -->
+<style>
+  .onboard-overlay { position:fixed;inset:0;z-index:9998;pointer-events:none; }
+  .onboard-highlight { position:absolute;z-index:9999;border:2px solid var(--primary);border-radius:8px;box-shadow:0 0 0 4000px rgba(0,0,0,.55);pointer-events:none;transition:all .3s ease; }
+  .onboard-tooltip {
+    position:absolute;z-index:10000;background:var(--surface);border:1px solid var(--primary);
+    border-radius:var(--radius);padding:16px 18px;width:300px;max-width:90vw;
+    box-shadow:0 12px 40px rgba(0,0,0,.4);pointer-events:auto;
+  }
+  .onboard-tooltip .ob-title { font-size:14px;font-weight:700;color:var(--text);margin-bottom:6px; }
+  .onboard-tooltip .ob-desc { font-size:12px;color:var(--text-2);line-height:1.6;margin-bottom:14px; }
+  .onboard-tooltip .ob-step { font-size:10px;color:var(--text-muted);margin-bottom:8px; }
+  .onboard-tooltip .ob-actions { display:flex;gap:8px;justify-content:flex-end; }
+  .onboard-tooltip .ob-btn {
+    padding:6px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;
+    cursor:pointer;border:none;font-family:var(--font);
+  }
+  .onboard-tooltip .ob-next { background:var(--primary);color:#0d1117; }
+  .onboard-tooltip .ob-skip { background:transparent;color:var(--text-muted);border:1px solid var(--border); }
+</style>
+<div class="onboard-overlay" id="obOverlay" style="display:none">
+  <div class="onboard-highlight" id="obHighlight"></div>
+  <div class="onboard-tooltip" id="obTooltip">
+    <div class="ob-step" id="obStep"></div>
+    <div class="ob-title" id="obTitle"></div>
+    <div class="ob-desc" id="obDesc"></div>
+    <div class="ob-actions">
+      <button class="ob-btn ob-skip" onclick="endTour()">Skip</button>
+      <button class="ob-btn ob-next" id="obNextBtn" onclick="nextStep()">Next</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* ── Theme toggle ── */
+  var theme = localStorage.getItem('pb-theme') || 'dark';
+  document.documentElement.setAttribute('data-theme', theme);
+  updateIcon(theme);
+  window.toggleTheme = function(){
+    var cur = document.documentElement.getAttribute('data-theme') || 'dark';
+    var next = cur === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    localStorage.setItem('pb-theme', next);
+    updateIcon(next);
+  };
+  function updateIcon(t){
+    var el = document.getElementById('themeIcon');
+    if(!el) return;
+    if(t==='light') el.innerHTML='<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>';
+    else el.innerHTML='<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>';
+  }
+
+  /* ── Page help content ── */
+  var helpTexts = {
+    'index': {title:'Dashboard',content:'<p>System overview — broker status, CPU/memory gauges, port health, and live traffic charts.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Start/Stop</b> — control the packet broker engine</li><li><b>Port grid</b> — live link status with per-port sparklines</li><li><b>Traffic chart</b> — aggregated RX/TX throughput</li><li><b>Quick Access</b> — shortcuts to key pages</li></ul>'},
+    'rules': {title:'Rules & Topology',content:'<p>Visual port-to-port rule management with an interactive SVG diagram.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Drag</b> from a left port to a right port to create a connection</li><li><b>Click</b> a connection line to delete it</li><li><b>Table below</b> shows all rule details with search and pagination</li><li><b>Manual</b> button for advanced rule creation with all 22 fields</li></ul>'},
+    'logs': {title:'Logs',content:'<p>Application and broker logs with server-side pagination.</p><ul style="padding-left:16px;margin-top:8px"><li>Adjust <b>per-page</b> count (25/50/100/200)</li><li>User role: <b>admin</b> sees all logs, <b>user</b> sees only broker operational logs</li></ul>'},
+    'captures': {title:'Packet Capture',content:'<p>Start/stop packet captures and download PCAP files.</p><ul style="padding-left:16px;margin-top:8px"><li>Max <b>3 concurrent</b> captures, max <b>5 minutes</b></li><li>Enter a <b>filter expression</b> to capture specific traffic</li><li>Download the .pcap file for analysis</li></ul>'},
+    'mirror': {title:'Traffic Mirroring (SPAN)',content:'<p>Copy all traffic from one port to multiple destinations simultaneously.</p><ul style="padding-left:16px;margin-top:8px"><li>1:N mirroring — one source, many tool ports</li><li>No filtering — mirrors everything</li><li>Enable/disable without deleting</li></ul>'},
+    'loadbalance': {title:'Load Balancing',content:'<p>Distribute traffic across multiple output ports.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Round-robin</b> — packets distributed evenly</li><li><b>Hash-based</b> — same flow always goes to same port</li></ul>'},
+    'throttle': {title:'Bandwidth Throttling',content:'<p>Rate limit traffic per port using token bucket algorithm.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Mbps</b> — bandwidth cap</li><li><b>PPS</b> — packets per second cap</li><li>Burst = 2x configured rate</li></ul>'},
+    'dedup': {title:'Deduplication',content:'<p>Remove duplicate packets seen from multiple TAP sources.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Window</b> — time window for detection (default 100ms)</li><li><b>Hash Bytes</b> — how many packet bytes to compare</li><li>Hardware-accelerated hash-based detection</li></ul>'},
+    'ssldecrypt': {title:'SSL/TLS Inspection',content:'<p>Route encrypted traffic through a decryption appliance.</p><ul style="padding-left:16px;margin-top:8px"><li>Chain: <b>Encrypted Port → Decrypt Tool → Reinject Port</b></li><li>Creates 2 rules automatically per chain</li><li>Optional BPF filter (e.g. tcp port 443)</li></ul>'},
+    'alerts': {title:'Alerts',content:'<p>Threshold-based monitoring with webhook and email notifications.</p><ul style="padding-left:16px;margin-top:8px"><li>Metrics: drop rate, RX errors, link down, CPU, memory</li><li>5-minute cooldown per rule</li><li>Webhook + email + syslog forwarding</li></ul>'},
+    'healthcheck': {title:'Health Checks',content:'<p>Monitor tool output ports. Auto-disable rules when a port goes down.</p><ul style="padding-left:16px;margin-top:8px"><li>Checks link state every <b>5 seconds</b></li><li>Port down → affected rules auto-disabled</li><li>Port recovers → rules re-enabled</li></ul>'},
+    'cluster': {title:'Cluster',content:'<p>Multi-node broker coordination.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Standalone</b> — single device (default)</li><li><b>Controller</b> — central management node</li><li><b>Node</b> — reports to controller every 10s</li></ul>'},
+    'backups': {title:'Backups',content:'<p>Configuration backup, restore, and version history.</p><ul style="padding-left:16px;margin-top:8px"><li>Auto-backup before every rule change (last 20 kept)</li><li>Manual backup with description</li><li>Import/export ZIP files</li></ul>'},
+    'syslog': {title:'SIEM / Syslog',content:'<p>Forward alerts and logs to a remote syslog server (RFC 5424).</p><ul style="padding-left:16px;margin-top:8px"><li>UDP or TCP transport</li><li>Forward alert events and/or operational logs</li><li>Test connection button to verify</li></ul>'},
+    'mail': {title:'Email / SMTP',content:'<p>Email notifications for alerts.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Office 365</b> — Microsoft Graph API (no SMTP needed)</li><li><b>Gmail</b> — SMTP with App Password</li><li><b>Custom SMTP</b> — any mail server</li><li>Test email to verify settings</li></ul>'},
+    'users': {title:'Users',content:'<p>User and role management.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Admin</b> — full access to all features</li><li><b>User</b> — read-only, only operational logs</li><li>Change passwords, delete users</li></ul>'},
+    'profile': {title:'Profile',content:'<p>Your account settings.</p><ul style="padding-left:16px;margin-top:8px"><li>Change your password (min 8 chars)</li><li>Enable/disable <b>Two-Factor Authentication</b> with authenticator app</li></ul>'},
+    'license': {title:'License',content:'<p>Hardware-locked license management.</p><ul style="padding-left:16px;margin-top:8px"><li>Shows your <b>Hardware ID</b></li><li>Upload a .key license file</li><li>Features and expiry displayed</li></ul>'},
+    'firmware': {title:'Firmware',content:'<p>Upload and manage the broker engine firmware.</p><ul style="padding-left:16px;margin-top:8px"><li>Upload new firmware — previous version backed up automatically</li><li>Checksum verified</li><li>Rollback to previous versions</li></ul>'},
+    'audit': {title:'Audit Log',content:'<p>Who changed what and when.</p><ul style="padding-left:16px;margin-top:8px"><li>Login, rule changes, firmware, 2FA events</li><li>Includes username, action, detail, IP</li><li>Last 5000 entries kept</li></ul>'},
+    'dpi': {title:'Application Intelligence',content:'<p>Deep packet inspection with L7 protocol detection and application-aware routing.</p><ul style="padding-left:16px;margin-top:8px"><li><b>Protocol detection</b> — automatically identifies 28+ protocols from packet payload</li><li><b>IT protocols:</b> HTTP, TLS, SSH, DNS, SMTP, FTP, MQTT, RDP, SMB, LDAP, SIP, SNMP</li><li><b>OT/ICS protocols:</b> Modbus/TCP, DNP3, S7comm (Siemens), EtherNet/IP, BACnet, OPC-UA, IEC 104, FINS, HART-IP, PROFINET</li><li><b>DPI rules</b> — route, mirror, or drop traffic based on detected protocol</li><li><b>Risk levels</b> — OT protocols flagged as critical for security monitoring</li><li>Ideal for <b>OT/ICS security</b> and <b>network visibility</b></li></ul>'},
+    'masking': {title:'Packet Masking',content:'<p>Anonymize sensitive data in forwarded packets for compliance and privacy.</p><ul style="padding-left:16px;margin-top:8px"><li><b>IP anonymization</b> — zero last octet, hash-based (deterministic), or full mask</li><li><b>MAC anonymization</b> — randomize vendor portion or fully mask</li><li><b>Payload scrubbing</b> — zero out application data, keep network headers</li><li><b>Regex patterns</b> — mask emails, credit card numbers, phone numbers, custom PII</li><li>Apply per-port or globally</li><li>Useful for <b>GDPR/KVKK compliance</b> when forwarding traffic to third-party tools</li></ul>'},
+    'snmp': {title:'SNMP Agent',content:'<p>Network monitoring integration for enterprise NMS platforms.</p><ul style="padding-left:16px;margin-top:8px"><li><b>SNMPv2c</b> agent — responds to GET/GETNEXT queries</li><li><b>Community string</b> authentication</li><li><b>Available OIDs:</b> system description, uptime, hostname, broker status, rule count, CPU %, memory %, alert count</li><li>Compatible with <b>Zabbix, Nagios, PRTG, LibreNMS, Cacti</b></li><li>Configure listen port, community, location, contact</li></ul>'}
+  };
+
+  var activePage = document.querySelector('[data-active-page]');
+  var pageId = activePage ? activePage.dataset.activePage : '';
+  /* Fallback: detect from sidebar active link */
+  if(!pageId){
+    var act = document.querySelector('.nav-item.active');
+    if(act){
+      var href = act.getAttribute('href')||'';
+      if(href==='/') pageId='index';
+      else if(href==='/rules') pageId='rules';
+      else pageId = href.replace(/^\/admin\//,'').replace(/^\//,'').replace(/-/g,'');
+    }
+  }
+
+  window.toggleHelp = function(){
+    var p = document.getElementById('helpPanel');
+    var vis = p.style.display !== 'none';
+    p.style.display = vis ? 'none' : 'block';
+    if(!vis){
+      var h = helpTexts[pageId] || {title:'Help',content:'<p>No help available for this page yet.</p>'};
+      document.getElementById('helpContent').innerHTML =
+        '<div style="font-weight:700;font-size:15px;color:var(--text);margin-bottom:8px">'+h.title+'</div>'+h.content;
+    }
+  };
+
+  /* ── Onboarding tour ── */
+  var tourSteps = [
+    {sel:'.sidebar-brand', title:'Packet Broker', desc:'Welcome! This is your network packet broker control panel. Let\'s take a quick tour of the main features.'},
+    {sel:'.sidebar-status', title:'Broker Status', desc:'Shows whether the packet broker engine is running or stopped. Green = running, red = stopped.'},
+    {sel:'.nav-item[href="/"]', title:'Dashboard', desc:'System overview with CPU/memory gauges, port status grid, live traffic chart, and recent activity logs.'},
+    {sel:'.nav-item[href="/rules"]', title:'Rules & Topology', desc:'Visual port-to-port diagram. Drag from left (input) to right (output) to create forwarding rules. Click a line to delete.'},
+    {sel:'.nav-item[href="/captures"]', title:'Captures', desc:'Start packet captures and download PCAP files for traffic analysis.'},
+    {sel:'.nav-item[href="/alerts"]', title:'Alerts', desc:'Set threshold-based alerts (CPU, memory, drop rate). Get notified via webhook, email, or syslog.'},
+    {sel:'#helpBtn', title:'Help Button', desc:'Click this button anytime to see help for the current page. You can restart this tour from the help panel.'}
+  ];
+  var tourIdx = 0;
+  var tourActive = false;
+
+  window.startTour = function(){
+    /* Close help panel */
+    document.getElementById('helpPanel').style.display='none';
+    /* Check if already completed */
+    tourIdx=0; tourActive=true;
+    document.getElementById('obOverlay').style.display='block';
+    showStep();
+  };
+  window.nextStep = function(){
+    tourIdx++;
+    if(tourIdx>=tourSteps.length){ endTour(); return; }
+    showStep();
+  };
+  window.endTour = function(){
+    tourActive=false;
+    document.getElementById('obOverlay').style.display='none';
+    localStorage.setItem('pb-tour-done','1');
+  };
+
+  function showStep(){
+    var s=tourSteps[tourIdx];
+    var el=document.querySelector(s.sel);
+    var hl=document.getElementById('obHighlight');
+    var tt=document.getElementById('obTooltip');
+    document.getElementById('obStep').textContent='Step '+(tourIdx+1)+' of '+tourSteps.length;
+    document.getElementById('obTitle').textContent=s.title;
+    document.getElementById('obDesc').textContent=s.desc;
+    document.getElementById('obNextBtn').textContent = tourIdx===tourSteps.length-1 ? 'Finish' : 'Next';
+
+    if(el){
+      var r=el.getBoundingClientRect();
+      hl.style.display='block';
+      hl.style.left=(r.left-4)+'px';
+      hl.style.top=(r.top-4)+'px';
+      hl.style.width=(r.width+8)+'px';
+      hl.style.height=(r.height+8)+'px';
+      /* Position tooltip */
+      var ttLeft = r.right+12;
+      var ttTop = r.top;
+      if(ttLeft+320 > window.innerWidth){ ttLeft=r.left-320; }
+      if(ttLeft<10) ttLeft=10;
+      if(ttTop+200 > window.innerHeight) ttTop=window.innerHeight-220;
+      if(ttTop<10) ttTop=10;
+      tt.style.left=ttLeft+'px';
+      tt.style.top=ttTop+'px';
+    } else {
+      hl.style.display='none';
+      tt.style.left='50%';
+      tt.style.top='50%';
+      tt.style.transform='translate(-50%,-50%)';
+    }
+  }
+
+  /* Auto-start tour on first visit */
+  if(!localStorage.getItem('pb-tour-done') && document.querySelector('.sidebar-brand')){
+    setTimeout(startTour, 1000);
+  }
+})();
+</script>
+</body>
+</html>
+{{end}}

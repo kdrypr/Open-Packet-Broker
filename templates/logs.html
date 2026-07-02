@@ -1,0 +1,113 @@
+{{template "header" .}}
+
+<div class="page-hdr">
+  <div>
+    <h1 class="page-title">Logs</h1>
+    <p class="page-sub">
+      {{if .TotalLines}}{{.TotalLines}} total lines{{else}}No log entries{{end}}
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">
+      Log Entries
+      {{if .Entries}}
+        <span style="font-weight:400;color:var(--text-muted);margin-left:4px">
+          — page {{.CurrentPage}} of {{.TotalPages}}
+        </span>
+      {{end}}
+    </span>
+
+    <!-- Per-page selector -->
+    {{if .TotalLines}}
+    <form method="get" action="/logs" id="ppForm"
+          style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text-muted)">
+      <input type="hidden" name="page" value="1">
+      <label for="pp">Rows per page:</label>
+      <select class="pager-select" name="per_page" id="pp"
+              onchange="document.getElementById('ppForm').submit()">
+        {{$pp := .PerPage}}
+        <option value="25"  {{if eq $pp  25}}selected{{end}}>25</option>
+        <option value="50"  {{if eq $pp  50}}selected{{end}}>50</option>
+        <option value="100" {{if eq $pp 100}}selected{{end}}>100</option>
+        <option value="200" {{if eq $pp 200}}selected{{end}}>200</option>
+      </select>
+    </form>
+    {{end}}
+  </div>
+
+  {{if .Entries}}
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th style="width:155px">Time</th>
+          <th style="width:80px">Level</th>
+          <th>Message</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .Entries}}
+        <tr class="log-{{.Level}}">
+          <td class="log-ts">{{.Time}}</td>
+          <td>
+            <span class="badge badge-{{if .Level}}{{.Level}}{{else}}default{{end}}">
+              {{if .Level}}{{.Level}}{{else}}LOG{{end}}
+            </span>
+          </td>
+          <td class="log-msg">{{.Message}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div style="padding:12px 16px;border-top:1px solid var(--border-light)">
+    <div class="pager">
+      <span class="pager-info">
+        Showing
+        {{add (mul (sub .CurrentPage 1) .PerPage) 1}}–{{min (mul .CurrentPage .PerPage) .TotalLines}}
+        of {{.TotalLines}}
+      </span>
+
+      <div class="pager-spacer"></div>
+
+      <!-- Prev -->
+      {{if .HasPrev}}
+        <a class="pg" href="/logs?page={{.PrevPage}}&per_page={{.PerPage}}">‹</a>
+      {{else}}
+        <span class="pg off">‹</span>
+      {{end}}
+
+      <!-- Page numbers -->
+      {{$cur  := .CurrentPage}}
+      {{$pp   := .PerPage}}
+      {{range .PageNums}}
+        {{if eq . $cur}}
+          <span class="pg on">{{.}}</span>
+        {{else}}
+          <a class="pg" href="/logs?page={{.}}&per_page={{$pp}}">{{.}}</a>
+        {{end}}
+      {{end}}
+
+      <!-- Next -->
+      {{if .HasNext}}
+        <a class="pg" href="/logs?page={{.NextPage}}&per_page={{.PerPage}}">›</a>
+      {{else}}
+        <span class="pg off">›</span>
+      {{end}}
+    </div>
+  </div>
+
+  {{else}}
+  <div class="empty">
+    <div class="empty-ico">📄</div>
+    <div class="empty-txt">No log entries found.</div>
+  </div>
+  {{end}}
+</div>
+
+{{template "footer" .}}

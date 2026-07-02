@@ -1,0 +1,68 @@
+{{template "header" .}}
+<div class="page-hdr"><div><h1 class="page-title">Appliance Settings</h1><p class="page-sub">Branding &amp; identity, TLS certificate, FQDN</p></div></div>
+
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+
+<div style="display:grid;gap:16px;max-width:760px">
+
+  <!-- Branding -->
+  <div class="card" style="padding:18px">
+    <h2 style="font-size:15px;margin:0 0 4px">Branding</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px">Product name and logo shown across the UI and on the login page.</p>
+    <form method="post" action="/admin/settings/branding">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Product name</label>
+      <input name="product_name" maxlength="64" value="{{.AppConfig.ProductName}}" placeholder="Packet Broker"
+             style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;margin-bottom:12px">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">FQDN <span style="color:var(--text-muted);font-weight:400">(used for the self-signed certificate &amp; UI)</span></label>
+      <input name="fqdn" value="{{.AppConfig.FQDN}}" placeholder="broker.example.com"
+             style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;margin-bottom:12px">
+      <button class="btn btn-primary" type="submit">Save branding</button>
+    </form>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+
+    <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px">Logo</label>
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:12px">
+      {{if .LogoURL}}<img src="{{.LogoURL}}" alt="logo" style="width:40px;height:40px;object-fit:contain;border:1px solid var(--border);border-radius:8px;padding:4px;background:var(--bg)">{{else}}<span style="font-size:12px;color:var(--text-muted)">Built-in icon</span>{{end}}
+    </div>
+    <form method="post" action="/admin/settings/logo" enctype="multipart/form-data" style="display:inline">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <input type="file" name="logo" accept="image/png,image/jpeg,image/gif,image/x-icon" required
+             style="font-size:12px;margin-right:8px">
+      <button class="btn btn-primary" type="submit">Upload</button>
+    </form>
+    {{if .LogoURL}}
+    <form method="post" action="/admin/settings/logo/clear" style="display:inline;margin-left:6px">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <button class="btn" type="submit">Remove</button>
+    </form>
+    {{end}}
+    <p style="font-size:11px;color:var(--text-muted);margin:8px 0 0">PNG, JPEG, GIF or ICO · max 1 MB · SVG not allowed.</p>
+  </div>
+
+  <!-- TLS -->
+  <div class="card" style="padding:18px">
+    <h2 style="font-size:15px;margin:0 0 4px">TLS Certificate</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px">Upload your own PEM certificate + key, or regenerate a self-signed certificate that includes the FQDN above. Changes apply on the next connection — no restart.</p>
+
+    <form method="post" action="/admin/settings/tls" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Certificate (PEM)</label>
+      <input type="file" name="cert" accept=".pem,.crt,.cer" required style="font-size:12px;margin-bottom:10px;display:block">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">Private key (PEM)</label>
+      <input type="file" name="key" accept=".pem,.key" required style="font-size:12px;margin-bottom:12px;display:block">
+      <button class="btn btn-primary" type="submit">Install certificate</button>
+    </form>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:16px 0">
+
+    <form method="post" action="/admin/settings/tls/regen">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <button class="btn" type="submit">Regenerate self-signed (FQDN: {{if .AppConfig.FQDN}}{{.AppConfig.FQDN}}{{else}}hostname{{end}})</button>
+    </form>
+  </div>
+
+</div>
+{{template "footer" .}}

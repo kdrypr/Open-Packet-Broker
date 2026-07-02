@@ -1,0 +1,193 @@
+{{template "header" .}}
+<div class="page-hdr"><div><h1 class="page-title">Email / SMTP Settings</h1><p class="page-sub">Configure email notifications for alerts</p></div></div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">SMTP Configuration</span>
+    {{if .MailConfig.Enabled}}<span class="badge" style="background:var(--success-dim);color:var(--success);border:1px solid rgba(63,185,80,.2)">ACTIVE</span>
+    {{else}}<span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">DISABLED</span>{{end}}
+  </div>
+  <div class="card-body">
+    <form action="/admin/mail" method="post" id="mailForm">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <!-- Provider presets -->
+      <div style="margin-bottom:16px">
+        <div class="form-label" style="margin-bottom:8px">Provider Preset</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="setPreset('smtp')" id="preSmtp">Custom SMTP</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="setPreset('o365')" id="preO365">
+            <svg width="14" height="14" viewBox="0 0 24 24" style="margin-right:2px"><rect x="2" y="2" width="20" height="20" rx="3" fill="#D83B01" opacity=".8"/><text x="12" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">O</text></svg>
+            Office 365
+          </button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="setPreset('gmail')" id="preGmail">
+            <svg width="14" height="14" viewBox="0 0 24 24" style="margin-right:2px"><rect x="2" y="2" width="20" height="20" rx="3" fill="#EA4335" opacity=".8"/><text x="12" y="17" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">G</text></svg>
+            Gmail
+          </button>
+        </div>
+      </div>
+      <input type="hidden" name="provider" id="fProvider" value="{{.MailConfig.Provider}}">
+
+      <div class="form-grid" style="max-width:800px">
+        <div class="form-group smtp-field">
+          <label class="form-label">SMTP Server *</label>
+          <input class="form-control" name="host" id="fHost" value="{{.MailConfig.Host}}" placeholder="smtp.gmail.com">
+        </div>
+        <div class="form-group smtp-field">
+          <label class="form-label">Port</label>
+          <input class="form-control" name="port" id="fPort" type="number" value="{{.MailConfig.Port}}" min="1" max="65535">
+        </div>
+        <div class="form-group smtp-field">
+          <label class="form-label">Encryption</label>
+          <select class="form-control" name="encryption" id="fEnc">
+            <option value="starttls" {{if eq .MailConfig.Encryption "starttls"}}selected{{end}}>STARTTLS (587)</option>
+            <option value="ssl" {{if eq .MailConfig.Encryption "ssl"}}selected{{end}}>SSL/TLS (465)</option>
+            <option value="none" {{if eq .MailConfig.Encryption "none"}}selected{{end}}>None (25)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-control" name="enabled">
+            <option value="1" {{if .MailConfig.Enabled}}selected{{end}}>Enabled</option>
+            <option value="0" {{if not .MailConfig.Enabled}}selected{{end}}>Disabled</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Username / Email *</label>
+          <input class="form-control" name="username" value="{{.MailConfig.Username}}" placeholder="user@company.com">
+        </div>
+        <div class="form-group smtp-field">
+          <label class="form-label">Password / App Password</label>
+          <input class="form-control" name="password" type="password" value="{{.MailConfig.Password}}" placeholder="{{if .MailConfig.Password}}********{{else}}enter password{{end}}">
+        </div>
+        <div class="form-group">
+          <label class="form-label">From Address *</label>
+          <input class="form-control" name="from_address" value="{{.MailConfig.FromAddress}}" placeholder="noreply@company.com" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">From Name</label>
+          <input class="form-control" name="from_name" value="{{.MailConfig.FromName}}" placeholder="Packet Broker">
+        </div>
+      </div>
+
+      <!-- O365 Graph API fields -->
+      <div id="o365Fields" style="margin-top:16px;padding:16px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);display:none">
+        <div style="font-size:11px;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><rect x="2" y="2" width="20" height="20" rx="3"/><text x="12" y="17" text-anchor="middle" fill="currentColor" font-size="12" font-weight="700">O</text></svg>
+          Microsoft Azure AD / Graph API
+        </div>
+        <div class="form-grid" style="max-width:800px">
+          <div class="form-group">
+            <label class="form-label">Tenant ID *</label>
+            <input class="form-control" name="tenant_id" value="{{.MailConfig.TenantID}}" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Client ID (App ID) *</label>
+            <input class="form-control" name="client_id" value="{{.MailConfig.ClientID}}" placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+          </div>
+          <div class="form-group" style="grid-column:span 2">
+            <label class="form-label">Client Secret *</label>
+            <input class="form-control" name="client_secret" type="password" value="{{.MailConfig.ClientSecret}}" placeholder="{{if .MailConfig.ClientSecret}}********{{else}}Azure app secret value{{end}}">
+          </div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);margin-top:8px;line-height:1.6">
+          Azure Portal &rarr; App registrations &rarr; New registration &rarr; API permissions &rarr; Add <code style="color:var(--primary)">Mail.Send</code> (Application) &rarr; Grant admin consent
+        </div>
+      </div>
+
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+        <div class="form-label" style="margin-bottom:8px">Alert Recipients (comma-separated)</div>
+        <input class="form-control" name="alert_emails" value="{{.MailConfig.AlertEmails}}"
+               placeholder="admin@company.com, soc@company.com" style="max-width:500px">
+        <div style="font-size:11px;color:var(--text-muted);margin-top:4px">Alert events will be emailed to these addresses</div>
+      </div>
+
+      <div style="margin-top:18px;display:flex;gap:8px">
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Test -->
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Test Email</span></div>
+  <div class="card-body">
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Send a test email to verify your SMTP settings are correct.</p>
+    <form action="/admin/mail/test" method="post" style="display:flex;gap:8px;align-items:flex-end;max-width:400px">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-group" style="flex:1">
+        <label class="form-label">Recipient</label>
+        <input class="form-control" name="to" type="email" required placeholder="you@company.com">
+      </div>
+      <button type="submit" class="btn btn-ghost">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Send Test
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Provider hints -->
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Setup Guides</span></div>
+  <div class="card-body" style="font-size:12px;color:var(--text-muted);line-height:1.8">
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:10px 16px">
+      <strong style="color:var(--primary)">Office 365<br><span style="font-weight:400;font-size:10px;color:var(--text-muted)">(Graph API)</span></strong>
+      <div style="line-height:1.7">
+        Microsoft SMTP Basic Auth kullanim disi. Graph API kullaniliyor:<br>
+        1. <strong>Azure Portal</strong> &rarr; Azure Active Directory &rarr; App registrations &rarr; <strong>New registration</strong><br>
+        2. Application (client) ID ve Directory (tenant) ID'yi kopyala<br>
+        3. Certificates &amp; secrets &rarr; New client secret &rarr; degeri kopyala<br>
+        4. API permissions &rarr; Add permission &rarr; Microsoft Graph &rarr; Application &rarr; <code style="color:var(--primary)">Mail.Send</code><br>
+        5. <strong>Grant admin consent</strong> tikla<br>
+        6. From Address: mail gonderecek kullanicinin email adresi (mailbox olmali)
+      </div>
+
+      <strong style="color:var(--text-2)">Gmail</strong>
+      <div style="line-height:1.7">
+        Host: <code style="color:var(--primary)">smtp.gmail.com</code> &middot; Port: <code>587</code> &middot; STARTTLS<br>
+        Username: Gmail adresi &middot; Password: <strong>App Password</strong> (2FA aktifse myaccount.google.com/apppasswords)
+      </div>
+
+      <strong style="color:var(--text-2)">Custom SMTP</strong>
+      <span>Mail sunucu bilgilerini girin. Host, port ve encryption ayarlari icin email saglayiciniza daniin.</span>
+    </div>
+  </div>
+</div>
+
+<script>
+function setPreset(p){
+  var h=document.getElementById('fHost'),
+      port=document.getElementById('fPort'),
+      enc=document.getElementById('fEnc'),
+      prov=document.getElementById('fProvider'),
+      o365=document.getElementById('o365Fields'),
+      smtpFields=document.querySelectorAll('.smtp-field');
+  prov.value=p;
+  document.querySelectorAll('[id^="pre"]').forEach(function(b){b.style.borderColor='';b.style.color='';});
+  if(p==='o365'){
+    o365.style.display='block';
+    smtpFields.forEach(function(el){el.style.display='none';});
+    document.getElementById('preO365').style.borderColor='var(--primary)';
+    document.getElementById('preO365').style.color='var(--primary)';
+  }else{
+    o365.style.display='none';
+    smtpFields.forEach(function(el){el.style.display='';});
+    if(p==='gmail'){
+      h.value='smtp.gmail.com';port.value=587;enc.value='starttls';
+      document.getElementById('preGmail').style.borderColor='var(--primary)';
+      document.getElementById('preGmail').style.color='var(--primary)';
+    }else{
+      document.getElementById('preSmtp').style.borderColor='var(--primary)';
+      document.getElementById('preSmtp').style.color='var(--primary)';
+    }
+  }
+}
+var cur='{{.MailConfig.Provider}}';
+if(cur)setPreset(cur);
+</script>
+
+{{template "footer" .}}

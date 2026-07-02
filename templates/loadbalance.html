@@ -1,0 +1,81 @@
+{{template "header" .}}
+
+<div class="page-hdr">
+  <div>
+    <h1 class="page-title">Load Balancing</h1>
+    <p class="page-sub">Port groups for traffic distribution</p>
+  </div>
+</div>
+
+{{if .FlashError}}
+<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>
+{{end}}
+{{if .FlashSuccess}}
+<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>
+{{end}}
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Create Port Group</span></div>
+  <div class="card-body">
+    <form action="/load-balance" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:700px">
+        <div class="form-group">
+          <label class="form-label">Group Name *</label>
+          <input class="form-control" name="name" required placeholder="e.g. Web Servers">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Mode</label>
+          <select class="form-control" name="mode">
+            <option value="round-robin">Round Robin</option>
+            <option value="hash">Hash-based</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Input Ports *</label>
+          <input class="form-control" name="input_ports" placeholder="eth0,eth1" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Output Ports *</label>
+          <input class="form-control" name="output_ports" placeholder="eth12,eth13,eth14" required>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <button type="submit" class="btn btn-primary">Create Group</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Port Groups{{if .PortGroups}} <span style="font-weight:400;color:var(--text-muted)">({{len .PortGroups}})</span>{{end}}</span></div>
+  {{if .PortGroups}}
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr><th>#</th><th>Name</th><th>Mode</th><th>Input Ports</th><th>Output Ports</th><th>Created</th><th>Action</th></tr></thead>
+      <tbody>
+        {{range .PortGroups}}
+        <tr>
+          <td style="color:var(--text-muted);font-size:11px">{{.ID}}</td>
+          <td style="font-weight:500">{{.Name}}</td>
+          <td><span class="badge badge-INFO">{{.Mode}}</span></td>
+          <td class="mono" style="font-size:11px">{{join .InputPorts ", "}}</td>
+          <td class="mono" style="font-size:11px">{{join .OutputPorts ", "}}</td>
+          <td style="font-size:11px;color:var(--text-muted)">{{.Created}}</td>
+          <td>
+            <form action="/load-balance/{{.ID}}/delete" method="post" style="display:inline">
+              <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+              <button class="btn btn-danger btn-sm">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="empty"><div class="empty-txt" style="padding:32px">No port groups configured.</div></div>
+  {{end}}
+</div>
+
+{{template "footer" .}}

@@ -1,0 +1,49 @@
+{{template "header" .}}
+<div class="page-hdr">
+  <div><h1 class="page-title">Cluster Management</h1><p class="page-sub">Multi-node broker coordination</p></div>
+</div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Cluster Configuration</span>
+    <span class="badge" style="background:{{if eq .ClusterConfig.Mode "controller"}}var(--primary-dim);color:var(--primary){{else if eq .ClusterConfig.Mode "node"}}var(--success-dim);color:var(--success){{else}}rgba(255,255,255,.07);color:var(--text-muted){{end}}">{{.ClusterConfig.Mode}}</span>
+  </div>
+  <div class="card-body">
+    <form action="/cluster/config" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:700px">
+        <div class="form-group"><label class="form-label">Mode</label>
+          <select class="form-control" name="mode">
+            <option value="standalone" {{if eq .ClusterConfig.Mode "standalone"}}selected{{end}}>Standalone</option>
+            <option value="controller" {{if eq .ClusterConfig.Mode "controller"}}selected{{end}}>Controller</option>
+            <option value="node" {{if eq .ClusterConfig.Mode "node"}}selected{{end}}>Node</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Node Name</label><input class="form-control" name="node_name" value="{{.ClusterConfig.NodeName}}" placeholder="broker-01"></div>
+        <div class="form-group"><label class="form-label">Node Address</label><input class="form-control" name="node_address" value="{{.ClusterConfig.NodeAddress}}" placeholder="192.168.1.10:8005"></div>
+        <div class="form-group"><label class="form-label">Controller URL (for node mode)</label><input class="form-control" name="controller_url" value="{{.ClusterConfig.ControllerURL}}" placeholder="http://192.168.1.1:8005"></div>
+      </div>
+      <div style="margin-top:14px"><button type="submit" class="btn btn-primary">Save Config</button></div>
+    </form>
+  </div>
+</div>
+
+{{if eq .ClusterConfig.Mode "controller"}}
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Cluster Nodes{{if .ClusterNodes}} <span style="font-weight:400;color:var(--text-muted)">({{len .ClusterNodes}})</span>{{end}}</span></div>
+  {{if .ClusterNodes}}
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Address</th><th>Status</th><th>Broker</th><th>Rules</th><th>Uptime</th><th>Last Heartbeat</th></tr></thead><tbody>
+    {{range .ClusterNodes}}<tr>
+      <td style="font-weight:500">{{.Name}}</td><td class="mono">{{.Address}}</td>
+      <td>{{if eq .Status "online"}}<span class="badge" style="background:var(--success-dim);color:var(--success)">Online</span>{{else}}<span class="badge badge-ERROR">Offline</span>{{end}}</td>
+      <td>{{if eq .BrokerStatus "running"}}<span style="color:var(--success)">Running</span>{{else}}<span style="color:var(--danger)">Stopped</span>{{end}}</td>
+      <td class="mono">{{.RuleCount}}</td><td style="font-size:11px">{{.Uptime}}</td>
+      <td style="font-size:11px;color:var(--text-muted)">{{.LastHeartbeat}}</td>
+    </tr>{{end}}
+  </tbody></table></div>
+  {{else}}<div class="empty"><div class="empty-txt" style="padding:32px">No nodes registered yet. Configure nodes to report to this controller.</div></div>{{end}}
+</div>
+{{end}}
+{{template "footer" .}}

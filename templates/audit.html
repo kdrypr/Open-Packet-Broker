@@ -1,0 +1,17 @@
+{{template "header" .}}
+<div class="page-hdr"><div><h1 class="page-title">Audit Log</h1><p class="page-sub">Who changed what &amp; when</p></div></div>
+<div class="card">
+  <div class="card-header"><span class="card-title">Recent Activity{{if .AuditEntries}} <span style="font-weight:400;color:var(--text-muted)">({{len .AuditEntries}})</span>{{end}}</span></div>
+  {{if .AuditEntries}}
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Detail</th><th>IP</th></tr></thead><tbody>
+    {{range .AuditEntries}}<tr>
+      <td style="font-size:11px;color:var(--text-muted);white-space:nowrap;font-family:var(--mono)">{{.Timestamp}}</td>
+      <td style="font-weight:500">{{.Username}}</td>
+      <td><span class="badge badge-INFO">{{.Action}}</span></td>
+      <td style="font-size:12px;max-width:350px;overflow:hidden;text-overflow:ellipsis">{{.Detail}}</td>
+      <td class="mono" style="font-size:11px;color:var(--text-muted)">{{.IP}}</td>
+    </tr>{{end}}
+  </tbody></table></div>
+  {{else}}<div class="empty"><div class="empty-txt" style="padding:32px">No audit events recorded yet.</div></div>{{end}}
+</div>
+{{template "footer" .}}

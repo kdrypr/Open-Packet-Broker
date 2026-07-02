@@ -1,0 +1,44 @@
+{{template "header" .}}
+<div class="page-hdr"><div><h1 class="page-title">SNMP Agent</h1><p class="page-sub">Network monitoring integration (Zabbix, Nagios, PRTG, LibreNMS)</p></div></div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">SNMP Configuration</span>
+    {{if .SNMPConfig.Enabled}}<span class="badge" style="background:var(--success-dim);color:var(--success)">ACTIVE</span>
+    {{else}}<span class="badge badge-default">DISABLED</span>{{end}}
+  </div>
+  <div class="card-body">
+    <form action="/admin/snmp" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:700px">
+        <div class="form-group"><label class="form-label">Status</label>
+          <select class="form-control" name="enabled"><option value="1" {{if .SNMPConfig.Enabled}}selected{{end}}>Enabled</option><option value="0" {{if not .SNMPConfig.Enabled}}selected{{end}}>Disabled</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Community String</label><input class="form-control" name="community" value="{{.SNMPConfig.Community}}" placeholder="public"></div>
+        <div class="form-group"><label class="form-label">Listen Port</label><input class="form-control" name="port" type="number" value="{{.SNMPConfig.Port}}" min="1" max="65535"></div>
+        <div class="form-group"><label class="form-label">System Location</label><input class="form-control" name="location" value="{{.SNMPConfig.Location}}" placeholder="Server Room A"></div>
+        <div class="form-group"><label class="form-label">System Contact</label><input class="form-control" name="contact" value="{{.SNMPConfig.Contact}}" placeholder="admin@company.com"></div>
+      </div>
+      <div style="margin-top:14px"><button type="submit" class="btn btn-primary">Save Configuration</button></div>
+    </form>
+  </div>
+</div>
+
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Available OIDs</span></div>
+  <div class="card-body" style="font-size:12px;color:var(--text-muted)">
+    <div class="table-wrap"><table class="tbl"><thead><tr><th>OID</th><th>Name</th><th>Type</th><th>Description</th></tr></thead><tbody>
+      <tr><td class="mono">1.3.6.1.2.1.1.1.0</td><td>sysDescr</td><td>String</td><td>System description</td></tr>
+      <tr><td class="mono">1.3.6.1.2.1.1.3.0</td><td>sysUpTime</td><td>TimeTicks</td><td>System uptime</td></tr>
+      <tr><td class="mono">1.3.6.1.2.1.1.5.0</td><td>sysName</td><td>String</td><td>Hostname</td></tr>
+      <tr><td class="mono">1.3.6.1.4.1.99999.1</td><td>brokerStatus</td><td>Integer</td><td>1=running, 0=stopped</td></tr>
+      <tr><td class="mono">1.3.6.1.4.1.99999.2</td><td>ruleCount</td><td>Integer</td><td>Active forwarding rules</td></tr>
+      <tr><td class="mono">1.3.6.1.4.1.99999.3</td><td>cpuPercent</td><td>Integer</td><td>CPU usage percentage</td></tr>
+      <tr><td class="mono">1.3.6.1.4.1.99999.4</td><td>memPercent</td><td>Integer</td><td>Memory usage percentage</td></tr>
+      <tr><td class="mono">1.3.6.1.4.1.99999.5</td><td>alertCount</td><td>Integer</td><td>Unacknowledged alerts</td></tr>
+    </tbody></table></div>
+  </div>
+</div>
+{{template "footer" .}}

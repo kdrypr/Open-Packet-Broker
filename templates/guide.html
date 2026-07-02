@@ -1,0 +1,81 @@
+{{template "header" .}}
+<style>
+  .guide { max-width: 880px; }
+  .guide h2 { font-size: 17px; margin: 26px 0 8px; padding-top: 10px; border-top: 1px solid var(--border); }
+  .guide h2:first-of-type { border-top: none; padding-top: 0; }
+  .guide h3 { font-size: 14px; margin: 16px 0 6px; color: var(--text); }
+  .guide p, .guide li { font-size: 13px; line-height: 1.6; color: var(--text); }
+  .guide ul { margin: 6px 0 10px; padding-left: 20px; }
+  .guide code { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; font-size: 12px; }
+  .guide .toc a { display: inline-block; margin: 2px 10px 2px 0; font-size: 12px; }
+  .guide .note { background: rgba(247,166,73,.10); border: 1px solid rgba(247,166,73,.3); border-radius: 8px; padding: 10px 14px; font-size: 12.5px; margin: 10px 0; }
+</style>
+<div class="page-hdr"><div><h1 class="page-title">Administration Guide</h1><p class="page-sub">{{.ProductName}} — operating the appliance</p></div></div>
+
+<div class="guide card" style="padding:22px">
+
+  <div class="toc">
+    <a href="#first">First login</a><a href="#dataplane">Data-plane modes</a><a href="#rules">Rules &amp; topology</a>
+    <a href="#advanced">Mirror / LB / SSL / Dedup / DPI / Masking</a><a href="#monitor">Monitoring &amp; alerts</a>
+    <a href="#cluster">Cluster</a><a href="#captures">Captures</a><a href="#backups">Backups &amp; firmware</a>
+    <a href="#identity">TLS, FQDN &amp; branding</a><a href="#users">Users &amp; 2FA</a><a href="#license">License</a><a href="#trouble">Troubleshooting</a>
+  </div>
+
+  <h2 id="first">First login</h2>
+  <p>The appliance ships with a single administrator account. On first sign-in you are forced to change the password before any other page is reachable. Use a strong, unique password — sessions are bcrypt-backed and expire after 8&nbsp;hours (30&nbsp;min idle).</p>
+  <div class="note">For production, enable two-factor authentication (Profile → Two-Factor) and upload a real TLS certificate (below). The default certificate is self-signed.</div>
+
+  <h2 id="dataplane">Data-plane modes</h2>
+  <p>The forwarding engine runs as a separate, root data-plane process. The backend is fixed at install/boot time via the <code>BROKER_MODE</code> setting and shown in the sidebar pill:</p>
+  <ul>
+    <li><strong>libpcap</strong> — broadest NIC compatibility; one capture thread per input interface.</li>
+    <li><strong>afxdp</strong> — zero-copy AF_XDP fast path on driver-mode XDP NICs (i40e/igc/ice/mlx5); one worker per RX queue. Interfaces stay kernel-visible, so the UI sees them by name. Recommended default.</li>
+    <li><strong>dpdk</strong> — DPDK PMD; one worker lcore per port. Requires operator hugepage + NIC binding (vfio-pci), and bound NICs leave the kernel — see the deployment notes. The management NIC must never be DPDK-bound.</li>
+  </ul>
+  <p>Start/stop the data plane from the dashboard. Rules can be added/edited/removed at runtime without restarting — the engine binds all data-plane ports up front.</p>
+
+  <h2 id="rules">Rules &amp; topology</h2>
+  <p>A rule forwards traffic from one input port to one output port, optionally filtered and manipulated. Fields: input/output interface, protocol, source/dest port, TCP flags, VLAN match, source/dest IP (CIDR), source/dest MAC, payload string match, BPF filter, and an <em>exclude</em> (invert) flag. Manipulation: VLAN add/remove/change and truncation.</p>
+  <p>The management interface is auto-detected and removed from every port selector, so you cannot accidentally forward through the port you administer the box on. The topology diagram visualises active links.</p>
+
+  <h2 id="advanced">Mirror / Load-balance / SSL / Dedup / DPI / Masking</h2>
+  <ul>
+    <li><strong>Mirror</strong> — copy one source to several destinations (SPAN/TAP aggregation).</li>
+    <li><strong>Load-balance</strong> — spread one input across several outputs.</li>
+    <li><strong>SSL decrypt chain</strong> — route encrypted → inspection tool → re-inject, with an optional BPF pre-filter.</li>
+    <li><strong>Deduplication</strong> — drop near-duplicate frames within a time window (CRC over the first N bytes).</li>
+    <li><strong>DPI</strong> — classify L7/OT protocols (HTTP, TLS, DNS, SSH, Modbus, DNP3, S7comm, …) and route by protocol.</li>
+    <li><strong>Masking</strong> — anonymise IP/MAC/payload or regex-replace PII before forwarding.</li>
+  </ul>
+
+  <h2 id="monitor">Monitoring &amp; alerts</h2>
+  <p>The dashboard shows live CPU/memory/uptime and per-port throughput. Configure threshold <strong>alerts</strong> (drop rate, link down, CPU, memory) and deliver them by <strong>email</strong> (SMTP or Microsoft Graph), <strong>syslog</strong>, or <strong>SNMP</strong> (the agent exposes status to Zabbix/Nagios/PRTG/LibreNMS). Outbound webhooks/SMTP are constrained to non-internal targets to prevent SSRF.</p>
+
+  <h2 id="cluster">Cluster</h2>
+  <p>Run several brokers as controller + nodes. Nodes send authenticated heartbeats (256-bit shared secret, constant-time check) to the controller, which aggregates status. Copy the controller secret into each node's cluster config.</p>
+
+  <h2 id="captures">Captures</h2>
+  <p>Start on-demand packet captures (tcpdump) per interface with an optional filter; download the resulting PCAP. Capture files have unguessable IDs and are admin-only.</p>
+
+  <h2 id="backups">Backups &amp; firmware</h2>
+  <p><strong>Backups</strong> export/import rules and config as a signed bundle. <strong>Firmware</strong> upgrades the data-plane binary — uploads MUST be vendor-signed (Ed25519); rollback re-verifies the stored signature before reinstalling. Unsigned binaries are refused.</p>
+
+  <h2 id="identity">TLS certificate, FQDN &amp; branding</h2>
+  <p>Under <strong>Settings</strong> you can: set the product <strong>name</strong> and upload a <strong>logo</strong> (PNG/JPEG/GIF/ICO; SVG is rejected); set the <strong>FQDN</strong>; and manage <strong>TLS</strong> — upload your own PEM certificate + key, or regenerate a self-signed certificate that includes the FQDN. TLS changes apply on the next connection without a restart. The server runs TLS&nbsp;1.3 only.</p>
+
+  <h2 id="users">Users &amp; 2FA</h2>
+  <p>Admins manage users (admin/user roles). Admin-created accounts must change their password on first login. Each user can enable TOTP two-factor (Google Authenticator/Authy); codes are single-use (replay-protected).</p>
+
+  <h2 id="license">License</h2>
+  <p>The product is hardware-ID locked (Ed25519 vendor-signed). Upload your license under Admin → License; the dashboard shows type, customer and expiry.</p>
+
+  <h2 id="trouble">Troubleshooting</h2>
+  <ul>
+    <li><strong>Data plane won't start</strong> — check the broker log (Logs page / <code>packet_broker.log</code>). For afxdp/dpdk confirm NIC capability; for dpdk confirm hugepages + NIC binding.</li>
+    <li><strong>Locked out after attaching a port</strong> — never select the management interface in a rule (it is auto-excluded). For dpdk, never vfio-bind the management NIC.</li>
+    <li><strong>Browser certificate warning</strong> — expected with the default self-signed cert; upload a CA-signed cert or set the FQDN and regenerate.</li>
+    <li><strong>Forgot password</strong> — reset requires console/physical access to the appliance.</li>
+  </ul>
+
+</div>
+{{template "footer" .}}

@@ -1,0 +1,45 @@
+{{template "header" .}}
+<div class="page-hdr">
+  <div><h1 class="page-title">SSL/TLS Inspection</h1><p class="page-sub">Route encrypted traffic through decryption appliances</p></div>
+</div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+{{if .IsAdmin}}
+<div class="card">
+  <div class="card-header"><span class="card-title">Create Inspection Chain</span></div>
+  <div class="card-body">
+    <form action="/ssl-decrypt" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding:14px;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);flex-wrap:wrap">
+        <div class="form-group" style="flex:1;min-width:120px"><label class="form-label">Encrypted Port *</label><input class="form-control" name="encrypted_port" required placeholder="eth0"></div>
+        <div style="color:var(--text-muted);font-size:18px;margin-top:16px">&rarr;</div>
+        <div class="form-group" style="flex:1;min-width:120px"><label class="form-label">Decrypt Tool Port *</label><input class="form-control" name="decrypt_tool_port" required placeholder="eth12"></div>
+        <div style="color:var(--text-muted);font-size:18px;margin-top:16px">&rarr;</div>
+        <div class="form-group" style="flex:1;min-width:120px"><label class="form-label">Reinject Port *</label><input class="form-control" name="reinject_port" required placeholder="eth13"></div>
+      </div>
+      <div class="form-grid" style="max-width:500px">
+        <div class="form-group"><label class="form-label">Chain Name *</label><input class="form-control" name="name" required placeholder="HTTPS Inspection"></div>
+        <div class="form-group"><label class="form-label">BPF Filter (optional)</label><input class="form-control" name="filter" placeholder="tcp port 443"></div>
+      </div>
+      <div style="margin-top:14px"><button type="submit" class="btn btn-primary">Create Chain</button></div>
+    </form>
+  </div>
+</div>
+{{end}}
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Inspection Chains{{if .SSLChains}} <span style="font-weight:400;color:var(--text-muted)">({{len .SSLChains}})</span>{{end}}</span></div>
+  {{if .SSLChains}}
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Encrypted</th><th>Tool</th><th>Reinject</th><th>Filter</th><th>Status</th>{{if .IsAdmin}}<th>Actions</th>{{end}}</tr></thead><tbody>
+    {{range .SSLChains}}<tr{{if not .Enabled}} style="opacity:0.45"{{end}}>
+      <td style="font-weight:500">{{.Name}}</td><td class="mono">{{.EncryptedPort}}</td><td class="mono">{{.DecryptToolPort}}</td><td class="mono">{{.ReinjectPort}}</td>
+      <td class="mono" style="font-size:11px">{{if .Filter}}{{.Filter}}{{else}}<span style="color:var(--text-muted)">any</span>{{end}}</td>
+      <td>{{if .Enabled}}<span class="badge" style="background:var(--success-dim);color:var(--success)">ON</span>{{else}}<span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">OFF</span>{{end}}</td>
+      {{if $.IsAdmin}}<td style="display:flex;gap:4px">
+        <form action="/ssl-decrypt/{{.ID}}/toggle" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-ghost btn-sm">{{if .Enabled}}Disable{{else}}Enable{{end}}</button></form>
+        <form action="/ssl-decrypt/{{.ID}}/delete" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-danger btn-sm">Delete</button></form>
+      </td>{{end}}
+    </tr>{{end}}
+  </tbody></table></div>
+  {{else}}<div class="empty"><div class="empty-txt" style="padding:32px">No SSL inspection chains configured.</div></div>{{end}}
+</div>
+{{template "footer" .}}

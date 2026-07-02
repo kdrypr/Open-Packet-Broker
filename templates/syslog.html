@@ -1,0 +1,140 @@
+{{template "header" .}}
+
+<div class="page-hdr">
+  <div>
+    <h1 class="page-title">Syslog / SIEM</h1>
+    <p class="page-sub">Forward alerts &amp; logs to a remote syslog server (RFC 5424)</p>
+  </div>
+</div>
+
+{{if .FlashError}}
+<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>
+{{end}}
+{{if .FlashSuccess}}
+<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>
+{{end}}
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Syslog Configuration</span>
+    {{if .SyslogConfig.Enabled}}
+    <span class="badge" style="background:var(--success-dim);color:var(--success);border:1px solid rgba(63,185,80,.2)">ACTIVE</span>
+    {{else}}
+    <span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">DISABLED</span>
+    {{end}}
+  </div>
+  <div class="card-body">
+    <form action="/admin/syslog" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+
+      <div class="form-grid" style="max-width:800px">
+        <div class="form-group">
+          <label class="form-label">Syslog Server *</label>
+          <input class="form-control" name="server" value="{{.SyslogConfig.Server}}"
+                 placeholder="192.168.1.100 or siem.corp.local" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Port</label>
+          <input class="form-control" name="port" type="number" value="{{.SyslogConfig.Port}}"
+                 min="1" max="65535">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Protocol</label>
+          <select class="form-control" name="protocol">
+            <option value="udp" {{if eq .SyslogConfig.Protocol "udp"}}selected{{end}}>UDP</option>
+            <option value="tcp" {{if eq .SyslogConfig.Protocol "tcp"}}selected{{end}}>TCP</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Facility</label>
+          <select class="form-control" name="facility">
+            <option value="16" {{if eq .SyslogConfig.Facility 16}}selected{{end}}>local0 (16)</option>
+            <option value="17" {{if eq .SyslogConfig.Facility 17}}selected{{end}}>local1 (17)</option>
+            <option value="18" {{if eq .SyslogConfig.Facility 18}}selected{{end}}>local2 (18)</option>
+            <option value="19" {{if eq .SyslogConfig.Facility 19}}selected{{end}}>local3 (19)</option>
+            <option value="20" {{if eq .SyslogConfig.Facility 20}}selected{{end}}>local4 (20)</option>
+            <option value="21" {{if eq .SyslogConfig.Facility 21}}selected{{end}}>local5 (21)</option>
+            <option value="22" {{if eq .SyslogConfig.Facility 22}}selected{{end}}>local6 (22)</option>
+            <option value="23" {{if eq .SyslogConfig.Facility 23}}selected{{end}}>local7 (23)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Source Name</label>
+          <input class="form-control" name="source_name" value="{{.SyslogConfig.SourceName}}"
+                 placeholder="packet-broker">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Status</label>
+          <select class="form-control" name="enabled">
+            <option value="1" {{if .SyslogConfig.Enabled}}selected{{end}}>Enabled</option>
+            <option value="0" {{if not .SyslogConfig.Enabled}}selected{{end}}>Disabled</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Forwarding Options</div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer">
+            <input type="hidden" name="forward_alerts" value="0">
+            <input type="checkbox" name="forward_alerts" value="1" {{if .SyslogConfig.ForwardAlerts}}checked{{end}}
+                   style="width:16px;height:16px;accent-color:var(--primary)">
+            Forward Alert Events
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-2);cursor:pointer">
+            <input type="hidden" name="forward_logs" value="0">
+            <input type="checkbox" name="forward_logs" value="1" {{if .SyslogConfig.ForwardLogs}}checked{{end}}
+                   style="width:16px;height:16px;accent-color:var(--primary)">
+            Forward Operational Logs
+          </label>
+        </div>
+      </div>
+
+      <div style="margin-top:18px;display:flex;gap:8px">
+        <button type="submit" class="btn btn-primary">Save Configuration</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Test -->
+<div class="card mt-12">
+  <div class="card-header">
+    <span class="card-title">Test Connection</span>
+  </div>
+  <div class="card-body">
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">
+      Send a test syslog message to verify connectivity with your SIEM.
+    </p>
+    <form action="/admin/syslog/test" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <button type="submit" class="btn btn-ghost">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+        Send Test Message
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Info -->
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">RFC 5424 Format Reference</span></div>
+  <div class="card-body" style="font-size:12px;color:var(--text-muted);line-height:1.8">
+    <div style="font-family:var(--mono);background:var(--bg);padding:12px 16px;border-radius:var(--radius-sm);border:1px solid var(--border);margin-bottom:12px;overflow-x:auto;white-space:nowrap">
+      &lt;PRI&gt;1 TIMESTAMP HOSTNAME APP-NAME PROCID - - MESSAGE
+    </div>
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px">
+      <strong style="color:var(--text-2)">Alerts:</strong>
+      <span>Severity 4 (Warning) &middot; Tag: <code style="color:var(--primary)">packet-broker-alert</code></span>
+      <strong style="color:var(--text-2)">Logs:</strong>
+      <span>Severity mapped: ERROR→3, WARN→4, INFO→6, DEBUG→7 &middot; Tag: <code style="color:var(--primary)">packet-broker</code></span>
+      <strong style="color:var(--text-2)">Test:</strong>
+      <span>Severity 6 (Info) &middot; Tag: <code style="color:var(--primary)">packet-broker-test</code></span>
+    </div>
+  </div>
+</div>
+
+{{template "footer" .}}

@@ -1,0 +1,61 @@
+# Binaries
+packet_broker
+packet_broker_ui
+/ndr-core
+/ndr-agent
+/license-portal
+*.exe
+
+# Runtime files
+users.db
+users.db-journal
+users.db-wal
+license.key
+cert.pem
+key.pem
+packet_broker.log
+packet_broker.log.*
+packet_broker.status
+packet_broker.pid
+rules_state.json
+dedup.conf
+captures/
+firmware_backups/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Go
+vendor/
+
+# Python cache (old code)
+__pycache__/
+*.pyc
+*.pyo
+
+# Appliance build artifacts + runtime (added 2026-06)
+packet_broker_afxdp
+packet_broker_dpdk
+*.o
+rules.conf
+dpi.conf
+masking.conf
+*.stats.json
+static/branding/
+fuzz_corpus/
+cert.pem.new
+key.pem.new
+snort_rules/
+
+# Local scratch + build artifacts (added 2026-06-30)
+ndr-loadtest
+ndr-loadtest-*
+.nightwork/
+fuzz_corpus_afxdp/

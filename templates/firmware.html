@@ -1,0 +1,48 @@
+{{template "header" .}}
+<div class="page-hdr"><div><h1 class="page-title">Firmware Update</h1><p class="page-sub">Upload &amp; manage broker binary</p></div></div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+
+<div class="card">
+  <div class="card-header"><span class="card-title">Current Firmware</span></div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:4px 16px;font-size:13px;max-width:500px">
+      <span style="color:var(--text-muted)">File:</span><span class="mono" style="font-size:11px">{{.FirmwareInfo.Name}}</span>
+      <span style="color:var(--text-muted)">Size:</span><span>{{.FirmwareInfo.Size}} bytes</span>
+      <span style="color:var(--text-muted)">SHA256:</span><span class="mono" style="font-size:10px;word-break:break-all">{{.FirmwareInfo.SHA256}}</span>
+      <span style="color:var(--text-muted)">Modified:</span><span>{{.FirmwareInfo.Modified}}</span>
+    </div>
+  </div>
+</div>
+
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Upload New Firmware</span></div>
+  <div class="card-body">
+    <form action="/admin/firmware" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-group" style="max-width:400px;margin-bottom:14px">
+        <label class="form-label">Binary File</label>
+        <input class="form-control" type="file" name="file" required>
+      </div>
+      <button type="submit" class="btn btn-danger" onclick="return confirm('Upload will replace the current broker binary. Continue?')">Upload &amp; Replace</button>
+    </form>
+  </div>
+</div>
+
+{{if .FirmwareBackups}}
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Firmware Backups</span></div>
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Size</th><th>Modified</th><th>Action</th></tr></thead><tbody>
+    {{range .FirmwareBackups}}<tr>
+      <td class="mono" style="font-size:11px">{{.Name}}</td>
+      <td>{{.Size}} B</td><td style="font-size:11px;color:var(--text-muted)">{{.Modified}}</td>
+      <td><form action="/admin/firmware/rollback" method="post" style="display:inline">
+        <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+        <input type="hidden" name="name" value="{{.Name}}">
+        <button class="btn btn-ghost btn-sm">Rollback</button>
+      </form></td>
+    </tr>{{end}}
+  </tbody></table></div>
+</div>
+{{end}}
+{{template "footer" .}}

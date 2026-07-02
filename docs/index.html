@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Open Packet Broker — hardware-grade network packet broker</title>
+<meta name="description" content="Open-source, hardware-grade network packet broker with a web UI. Capture, filter, manipulate, mirror, load-balance and forward packets between interfaces — rule-based, no vendor lock-in. Go control plane + C (libpcap / AF_XDP / DPDK) data plane." />
+<meta property="og:title" content="Open Packet Broker" />
+<meta property="og:description" content="Hardware-grade network packet broker with a web UI — filtering, VLAN manipulation, SPAN mirroring, load balancing, SSL inspection, deduplication. Go + C, MIT-licensed." />
+<meta property="og:type" content="website" />
+<style>
+  :root{
+    --bg:#0a0e14; --bg2:#0e131c; --panel:#121926; --panel2:#0f1520;
+    --line:#1e2a3a; --line2:#243347;
+    --tx:#c9d6e5; --tx2:#8fa3bd; --tx3:#5f7085;
+    --acc:#3ddc97; --acc2:#37c6ff; --acc3:#7c8cff;
+    --warn:#ffcc66;
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--bg);color:var(--tx);font-family:var(--sans);line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+  a{color:inherit;text-decoration:none}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 24px}
+  .mono{font-family:var(--mono)}
+  .accent{color:var(--acc)}
+  .grad{background:linear-gradient(100deg,var(--acc),var(--acc2) 55%,var(--acc3));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+
+  /* nav */
+  header{position:sticky;top:0;z-index:50;backdrop-filter:blur(10px);background:rgba(10,14,20,.72);border-bottom:1px solid var(--line)}
+  nav{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:700;letter-spacing:.3px}
+  .logo{width:26px;height:26px;flex:none}
+  .navlinks{display:flex;gap:26px;align-items:center;font-size:14px;color:var(--tx2)}
+  .navlinks a:hover{color:var(--tx)}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:8px;font-size:14px;font-weight:600;border:1px solid var(--line2);transition:.15s}
+  .btn.primary{background:linear-gradient(100deg,var(--acc),var(--acc2));color:#04120c;border-color:transparent}
+  .btn.primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+  .btn.ghost:hover{border-color:var(--acc);color:var(--acc)}
+  @media(max-width:760px){.navlinks .hide-sm{display:none}}
+
+  /* hero */
+  .hero{position:relative;padding:96px 0 72px;border-bottom:1px solid var(--line);overflow:hidden}
+  .hero::before{content:"";position:absolute;inset:0;background:
+    radial-gradient(600px 300px at 78% -10%,rgba(55,198,255,.14),transparent 60%),
+    radial-gradient(500px 260px at 12% 8%,rgba(61,220,151,.12),transparent 60%);pointer-events:none}
+  .gridbg{position:absolute;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:44px 44px;opacity:.20;mask-image:linear-gradient(180deg,#000,transparent 75%);pointer-events:none}
+  .tag{display:inline-flex;align-items:center;gap:8px;font-family:var(--mono);font-size:12.5px;color:var(--acc);border:1px solid var(--line2);background:var(--panel);padding:6px 12px;border-radius:999px;margin-bottom:22px}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc)}
+  h1{font-size:clamp(34px,6vw,60px);line-height:1.05;letter-spacing:-1.2px;font-weight:800;max-width:16ch}
+  .sub{margin-top:22px;font-size:clamp(16px,2.2vw,20px);color:var(--tx2);max-width:60ch}
+  .cta{margin-top:34px;display:flex;gap:14px;flex-wrap:wrap}
+  .badges{margin-top:40px;display:flex;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:12.5px;color:var(--tx3)}
+  .badge{border:1px solid var(--line);background:var(--panel2);border-radius:7px;padding:6px 11px}
+  .badge b{color:var(--tx)}
+
+  section{padding:78px 0;border-bottom:1px solid var(--line)}
+  .eyebrow{font-family:var(--mono);font-size:12.5px;letter-spacing:2px;text-transform:uppercase;color:var(--acc2)}
+  h2{font-size:clamp(26px,3.4vw,36px);letter-spacing:-.6px;margin-top:10px;font-weight:800}
+  .lead{color:var(--tx2);margin-top:14px;max-width:64ch}
+
+  /* features */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  @media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:600px){.grid{grid-template-columns:1fr}}
+  .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--line);border-radius:14px;padding:22px;transition:.18s}
+  .card:hover{border-color:var(--line2);transform:translateY(-3px)}
+  .ico{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;background:rgba(61,220,151,.10);border:1px solid var(--line2);margin-bottom:16px}
+  .ico svg{width:22px;height:22px;stroke:var(--acc);fill:none;stroke-width:1.7}
+  .card h3{font-size:17px;font-weight:700}
+  .card p{color:var(--tx2);font-size:14.5px;margin-top:8px}
+
+  /* architecture */
+  .arch{display:grid;grid-template-columns:1.1fr .9fr;gap:40px;align-items:center}
+  @media(max-width:840px){.arch{grid-template-columns:1fr}}
+  .stack{border:1px solid var(--line2);border-radius:14px;overflow:hidden;font-family:var(--mono);font-size:13px;box-shadow:0 20px 60px -30px rgba(0,0,0,.9)}
+  .layer{padding:18px 20px;border-bottom:1px solid var(--line);background:var(--panel)}
+  .layer:last-child{border-bottom:0}
+  .layer .lt{color:var(--tx);font-weight:600}
+  .layer .ld{color:var(--tx3);font-size:12px;margin-top:3px}
+  .l-ui{background:linear-gradient(90deg,rgba(124,140,255,.12),transparent)}
+  .l-c{background:linear-gradient(90deg,rgba(55,198,255,.12),transparent)}
+  .l-os{background:linear-gradient(90deg,rgba(61,220,151,.10),transparent)}
+  .flowbadge{font-family:var(--mono);font-size:12px;color:var(--acc);border:1px dashed var(--line2);border-radius:6px;padding:2px 8px;margin-left:8px}
+
+  /* code / quickstart */
+  .code{background:#070a0f;border:1px solid var(--line2);border-radius:12px;overflow:hidden;margin-top:26px}
+  .code .bar{display:flex;gap:7px;padding:12px 16px;border-bottom:1px solid var(--line);background:var(--panel2)}
+  .code .bar i{width:11px;height:11px;border-radius:50%;display:inline-block}
+  pre{padding:20px;overflow:auto;font-family:var(--mono);font-size:13.5px;line-height:1.7;color:var(--tx)}
+  .c-cmt{color:var(--tx3)} .c-cmd{color:var(--acc)} .c-arg{color:var(--acc2)} .c-str{color:var(--warn)}
+
+  .speclist{display:grid;grid-template-columns:repeat(2,1fr);gap:10px 30px;margin-top:24px}
+  @media(max-width:600px){.speclist{grid-template-columns:1fr}}
+  .speclist li{list-style:none;display:flex;gap:11px;color:var(--tx2);font-size:14.5px;padding:5px 0;border-bottom:1px solid var(--line)}
+  .speclist b{color:var(--tx);font-weight:600}
+  .chk{color:var(--acc);flex:none;margin-top:3px}
+
+  .cta-final{text-align:center;padding:92px 0}
+  .cta-final h2{max-width:20ch;margin:0 auto}
+  footer{padding:40px 0;color:var(--tx3);font-size:13.5px}
+  .foot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px}
+  .foot a:hover{color:var(--tx)}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap"><nav>
+    <a class="brand" href="#top">
+      <svg class="logo" viewBox="0 0 32 32" fill="none">
+        <rect x="2" y="2" width="28" height="28" rx="7" stroke="#3ddc97" stroke-width="2"/>
+        <path d="M9 11h6M9 16h14M9 21h9" stroke="#37c6ff" stroke-width="2" stroke-linecap="round"/>
+        <circle cx="23" cy="11" r="2.3" fill="#3ddc97"/>
+      </svg>
+      Open Packet Broker
+    </a>
+    <div class="navlinks">
+      <a href="#features" class="hide-sm">Features</a>
+      <a href="#architecture" class="hide-sm">Architecture</a>
+      <a href="#quickstart" class="hide-sm">Quick start</a>
+      <a class="btn ghost" href="https://github.com/kdrypr/Open-Packet-Broker">GitHub ↗</a>
+    </div>
+  </nav></div>
+</header>
+
+<main id="top">
+<!-- HERO -->
+<div class="hero">
+  <div class="gridbg"></div>
+  <div class="wrap">
+    <span class="tag"><span class="dot"></span> open-source · MIT licensed · Go + C</span>
+    <h1>The <span class="grad">hardware-grade</span> packet broker, fully open.</h1>
+    <p class="sub">Capture, filter, manipulate, mirror, load-balance and forward packets between network interfaces — driven by rules from a clean web UI. A Go control plane on top of a C data plane (libpcap · AF_XDP · DPDK). No appliance, no vendor lock-in.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/kdrypr/Open-Packet-Broker">★ Star on GitHub</a>
+      <a class="btn ghost" href="#quickstart">Quick start →</a>
+    </div>
+    <div class="badges">
+      <span class="badge"><b>Go</b> control plane</span>
+      <span class="badge"><b>C</b> libpcap / AF_XDP / DPDK</span>
+      <span class="badge"><b>24-port</b> SVG topology</span>
+      <span class="badge"><b>BPF</b> + protocol filtering</span>
+      <span class="badge"><b>SPAN</b> mirroring · LB · dedup</span>
+    </div>
+  </div>
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="wrap">
+    <span class="eyebrow">Capabilities</span>
+    <h2>Everything a commercial broker does — in code you can read.</h2>
+    <p class="lead">Rule-based forwarding with the manipulation, mirroring and inspection features you'd expect from a hardware network packet broker, exposed through a web UI and a programmable C data plane.</p>
+
+    <div class="grid">
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h10M4 17h13"/><circle cx="19" cy="12" r="2"/></svg></div>
+        <h3>Rule-based forwarding</h3>
+        <p>Priority-ordered rules match traffic and forward it between ingress and tool ports. Enable, disable and reorder live — no restart.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 5h18l-7 8v6l-4-2v-4z"/></svg></div>
+        <h3>Deep filtering</h3>
+        <p>Match on protocol, port, IP/CIDR, MAC, TCP flags, VLAN, raw string, and full BPF expressions — with exclude rules for carve-outs.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v18M5 8l7-5 7 5M5 16l7 5 7-5"/></svg></div>
+        <h3>Packet manipulation</h3>
+        <p>Add, remove or rewrite VLAN tags on the fly, and truncate / slice packets to strip payloads before they reach analysis tools.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M6 4v16M6 8h9l-2-2M6 16h12l-2 2"/><circle cx="18" cy="8" r="2"/><circle cx="20" cy="16" r="2"/></svg></div>
+        <h3>1:N mirroring / SPAN</h3>
+        <p>Copy a stream to multiple tool ports at once — feed an IDS, a recorder and an analyzer from the same tap without contention.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 4v6m0 0-3-3m3 3 3-3M5 14a4 4 0 0 0 8 0M11 14a4 4 0 0 0 8 0"/></svg></div>
+        <h3>Load balancing</h3>
+        <p>Spread traffic across a group of tool ports with round-robin or 5-tuple hash — keep flows sticky while scaling out capacity.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4-3 7-7 9-4-2-7-5-7-9V6z"/><path d="M9.5 12l2 2 3.5-4"/></svg></div>
+        <h3>SSL inspection chains</h3>
+        <p>Route encrypted flows through a decrypt tool and re-inject the cleartext for inspection — expressed as declarative routing chains.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="7" height="7" rx="1.5"/><rect x="13" y="13" width="7" height="7" rx="1.5"/><path d="M11 7h4v4"/></svg></div>
+        <h3>Deduplication</h3>
+        <p>CRC32 hash-based duplicate removal drops the copies that SPAN/TAP aggregation creates, so tools only see each packet once.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.4"/><circle cx="18" cy="6" r="2.4"/><circle cx="12" cy="18" r="2.4"/><path d="M6 8v3a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V8"/><path d="M12 14v2"/></svg></div>
+        <h3>24-port topology</h3>
+        <p>A drag-to-connect SVG topology of all 24 ports — wire ingress to tools visually and see the live forwarding graph at a glance.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 18l5-6 4 3 7-9"/><path d="M4 20h16"/></svg></div>
+        <h3>Line-rate C data plane</h3>
+        <p>Pick the engine per box: portable <b>libpcap</b>, zero-copy <b>AF_XDP</b>, or <b>DPDK</b> — the same rules, from a laptop to embedded ARM.</p>
+      </div>
+      <div class="card">
+        <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 9h18M7 21h10"/></svg></div>
+        <h3>Web UI + operations</h3>
+        <p>Auth, rule management, topology, live CPU/mem/throughput monitoring, SNMP, syslog/CEF to your SIEM, backups and i18n — built in.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ARCHITECTURE -->
+<section id="architecture">
+  <div class="wrap arch">
+    <div>
+      <span class="eyebrow">Architecture</span>
+      <h2>A thin control plane over a fast data plane.</h2>
+      <p class="lead">The Go web UI compiles rules and pushes them to a C binary that does the packet work with libpcap, AF_XDP or DPDK. Everything runs on plain Linux or embedded ARM — no proprietary silicon required.</p>
+      <ul class="speclist">
+        <li><span class="chk">▹</span><span><b>Pure-Go</b> control plane, CGO-free UI</span></li>
+        <li><span class="chk">▹</span><span><b>C</b> capture → match → forward core</span></li>
+        <li><span class="chk">▹</span><span><b>AF_XDP</b> zero-copy fast path</span></li>
+        <li><span class="chk">▹</span><span><b>VLAN</b>-aware, BPF-programmable</span></li>
+        <li><span class="chk">▹</span><span><b>SQLite</b> config, no external DB</span></li>
+        <li><span class="chk">▹</span><span><b>MIT</b> licensed, self-hosted</span></li>
+      </ul>
+    </div>
+    <div class="stack">
+      <div class="layer l-ui">
+        <div class="lt">Web UI · Go <span class="flowbadge">:8005</span></div>
+        <div class="ld">auth · rules · topology · monitoring · SNMP · syslog</div>
+      </div>
+      <div class="layer l-c">
+        <div class="lt">C data plane · libpcap / AF_XDP / DPDK</div>
+        <div class="ld">capture → rule match → manipulate → forward</div>
+      </div>
+      <div class="layer l-os">
+        <div class="lt">Linux · embedded ARM</div>
+        <div class="ld">network interfaces &nbsp;eth0 … ethN</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- QUICKSTART -->
+<section id="quickstart">
+  <div class="wrap">
+    <span class="eyebrow">Quick start</span>
+    <h2>Clone, build, broker.</h2>
+    <p class="lead">The control plane is pure Go; the C data plane needs libpcap (and optionally libbpf/libxdp for AF_XDP) on a Linux box.</p>
+    <div class="code">
+      <div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i></div>
+<pre><span class="c-cmt"># 1 — get the source</span>
+<span class="c-cmd">git</span> clone <span class="c-arg">https://github.com/kdrypr/Open-Packet-Broker</span>
+<span class="c-cmd">cd</span> Open-Packet-Broker
+
+<span class="c-cmt"># 2 — build the web/control plane (pure Go)</span>
+<span class="c-cmd">go</span> build <span class="c-arg">./cmd/packet-broker</span>
+
+<span class="c-cmt"># 3 — build the C data plane (Linux: needs libpcap-dev)</span>
+<span class="c-cmd">make</span> c            <span class="c-cmt"># libpcap + AF_XDP binaries</span>
+
+<span class="c-cmt"># 4 — run — then open the UI</span>
+<span class="c-cmd">sudo</span> ./packet-broker
+<span class="c-cmt"># → http://localhost:8005</span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-final wrap">
+  <span class="eyebrow">Free forever</span>
+  <h2>Own your traffic path. <span class="grad">Star it, fork it, ship it.</span></h2>
+  <p class="lead" style="margin:16px auto 30px">MIT-licensed and self-hosted — from a homelab tap to a production span aggregator.</p>
+  <div class="cta" style="justify-content:center">
+    <a class="btn primary" href="https://github.com/kdrypr/Open-Packet-Broker">★ Star on GitHub</a>
+    <a class="btn ghost" href="https://github.com/kdrypr/Open-Packet-Broker/fork">Fork the repo</a>
+  </div>
+</div>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="brand" style="font-size:14px">
+      <svg class="logo" viewBox="0 0 32 32" fill="none" style="width:20px;height:20px">
+        <rect x="2" y="2" width="28" height="28" rx="7" stroke="#3ddc97" stroke-width="2"/>
+        <path d="M9 11h6M9 16h14M9 21h9" stroke="#37c6ff" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+      Open Packet Broker
+    </div>
+    <div>MIT Licensed · Built with Go + C · <a href="https://github.com/kdrypr/Open-Packet-Broker">github.com/kdrypr/Open-Packet-Broker</a></div>
+  </div>
+</footer>
+
+</body>
+</html>

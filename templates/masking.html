@@ -1,0 +1,72 @@
+{{template "header" .}}
+<div class="page-hdr"><div><h1 class="page-title">Packet Masking</h1><p class="page-sub">Data anonymization &amp; PII protection</p></div></div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+
+{{if .IsAdmin}}
+<div class="card">
+  <div class="card-header"><span class="card-title">Add Masking Rule</span></div>
+  <div class="card-body">
+    <form action="/masking" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:800px">
+        <div class="form-group"><label class="form-label">Name *</label><input class="form-control" name="name" required placeholder="Anonymize source IPs"></div>
+        <div class="form-group"><label class="form-label">Type *</label>
+          <select class="form-control" name="type" id="maskType" onchange="toggleMaskFields()">
+            <option value="ip">IP Anonymization</option>
+            <option value="mac">MAC Anonymization</option>
+            <option value="payload">Payload Scrubbing</option>
+            <option value="regex">Regex Pattern</option>
+          </select>
+        </div>
+        <div class="form-group" id="methodGroup"><label class="form-label">Method</label>
+          <select class="form-control" name="method" id="maskMethod">
+            <option value="zero_last">Zero last octet (x.x.x.0)</option>
+            <option value="hash">Hash-based (deterministic)</option>
+            <option value="full">Full mask (0.0.0.0)</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Port (empty=all)</label><input class="form-control" name="port" placeholder="eth0"></div>
+        <div class="form-group" id="patternGroup" style="display:none;grid-column:span 2"><label class="form-label">Regex Pattern *</label><input class="form-control" name="pattern" placeholder="[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"></div>
+        <div class="form-group" id="replaceGroup" style="display:none"><label class="form-label">Replacement</label><input class="form-control" name="replacement" placeholder="***@***.***"></div>
+      </div>
+      <div style="margin-top:14px"><button type="submit" class="btn btn-primary">Add Rule</button></div>
+    </form>
+  </div>
+</div>
+{{end}}
+
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Masking Rules{{if .MaskingRules}} <span style="font-weight:400;color:var(--text-muted)">({{len .MaskingRules}})</span>{{end}}</span></div>
+  {{if .MaskingRules}}
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Type</th><th>Method/Pattern</th><th>Port</th><th>Status</th>{{if .IsAdmin}}<th>Actions</th>{{end}}</tr></thead><tbody>
+    {{range .MaskingRules}}<tr{{if not .Enabled}} style="opacity:0.45"{{end}}>
+      <td style="font-weight:500">{{.Name}}</td>
+      <td><span class="badge badge-INFO">{{.Type}}</span></td>
+      <td class="mono" style="font-size:11px;max-width:200px;overflow:hidden;text-overflow:ellipsis">{{if .Pattern}}{{.Pattern}}{{else}}{{.Method}}{{end}}</td>
+      <td class="mono">{{if .Port}}{{.Port}}{{else}}all{{end}}</td>
+      <td>{{if .Enabled}}<span class="badge" style="background:var(--success-dim);color:var(--success)">ON</span>{{else}}<span class="badge badge-default">OFF</span>{{end}}</td>
+      {{if $.IsAdmin}}<td style="display:flex;gap:4px">
+        <form action="/masking/{{.ID}}/toggle" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-ghost btn-sm">{{if .Enabled}}Disable{{else}}Enable{{end}}</button></form>
+        <form action="/masking/{{.ID}}/delete" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-danger btn-sm">Delete</button></form>
+      </td>{{end}}
+    </tr>{{end}}
+  </tbody></table></div>
+  {{else}}<div class="empty"><div class="empty-txt" style="padding:32px">No masking rules configured.</div></div>{{end}}
+</div>
+
+<script>
+function toggleMaskFields(){
+  var t=document.getElementById('maskType').value;
+  var m=document.getElementById('maskMethod');
+  var mg=document.getElementById('methodGroup');
+  var pg=document.getElementById('patternGroup');
+  var rg=document.getElementById('replaceGroup');
+  mg.style.display='block'; pg.style.display='none'; rg.style.display='none';
+  if(t==='ip'){m.innerHTML='<option value="zero_last">Zero last octet</option><option value="hash">Hash-based</option><option value="full">Full mask</option>';}
+  else if(t==='mac'){m.innerHTML='<option value="randomize_oui">Randomize OUI</option><option value="full">Full mask</option>';}
+  else if(t==='payload'){m.innerHTML='<option value="zero">Zero payload</option><option value="truncate">Truncate (headers only)</option>';}
+  else if(t==='regex'){mg.style.display='none';pg.style.display='block';rg.style.display='block';}
+}
+</script>
+{{template "footer" .}}

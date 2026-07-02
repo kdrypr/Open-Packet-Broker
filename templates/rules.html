@@ -1,0 +1,1083 @@
+{{template "header" .}}
+
+<style>
+  /* ── Topology ──────────────────────────────────── */
+  .topo-wrap { width:100%;overflow-x:auto;background:var(--bg);border-radius:0 0 var(--radius) var(--radius); }
+  .topo-wrap svg { display:block;width:100%;min-width:900px; }
+  .topo-wrap svg text { user-select:none;font-family:var(--font); }
+
+  @keyframes dash-flow { to { stroke-dashoffset:-12; } }
+  .conn-line { animation:dash-flow .8s linear infinite;cursor:pointer; }
+  .conn-line:hover { stroke-width:3.5;filter:brightness(1.3); }
+  .conn-hit  { cursor:pointer; }
+  .topo-port[data-side="left"] { cursor:grab; }
+  .topo-port[data-side="left"]:active { cursor:grabbing; }
+
+  @keyframes pulse-ring {
+    0%   { stroke-opacity:.7;stroke-width:3; }
+    100% { stroke-opacity:0;stroke-width:10; }
+  }
+  .port-pulse { animation:pulse-ring 1s ease-out infinite;pointer-events:none; }
+
+  /* ── Modal ─────────────────────────────────────── */
+  .modal-overlay {
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;
+    z-index:1000;backdrop-filter:blur(2px);
+  }
+  .modal-card {
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:24px 28px;
+    width:600px;max-width:92vw;max-height:85vh;overflow-y:auto;box-shadow:0 16px 48px rgba(0,0,0,.35);
+  }
+  .modal-title {
+    font-size:15px;font-weight:700;color:var(--text);
+    margin-bottom:16px;display:flex;align-items:center;gap:8px;
+  }
+  .modal-ports {
+    display:flex;gap:12px;margin-bottom:16px;padding:12px 14px;
+    background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+    align-items:center;flex-wrap:wrap;
+  }
+  .modal-port-tag {
+    display:inline-flex;align-items:center;gap:6px;
+    padding:4px 10px;border-radius:20px;font-size:12px;font-weight:600;
+  }
+  .modal-actions { display:flex;gap:8px;justify-content:flex-end;margin-top:18px; }
+
+  /* ── Hint bar ──────────────────────────────────── */
+  .topo-hint {
+    padding:8px 16px;font-size:12px;color:var(--primary);
+    background:var(--primary-dim);border:1px solid rgba(88,166,255,.2);
+    border-radius:var(--radius-sm);margin-bottom:12px;
+    display:flex;align-items:center;gap:8px;
+  }
+
+  /* ── Legend ─────────────────────────────────────── */
+  .legend { display:flex;gap:18px;margin-top:12px;flex-wrap:wrap; }
+  .legend-item { display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted); }
+  .legend-box { width:12px;height:12px;border-radius:3px;display:inline-block; }
+  .legend-line { width:24px;height:0;border-top:2px dashed;display:inline-block; }
+
+  /* ── Section divider ───────────────────────────── */
+  .section-sep { margin:22px 0 18px;border:0;border-top:1px solid var(--border-light); }
+
+  /* ── Confirm dialog ────────────────────────────── */
+  .confirm-overlay {
+    position:fixed;inset:0;background:rgba(0,0,0,.55);
+    display:flex;align-items:center;justify-content:center;
+    z-index:1100;backdrop-filter:blur(2px);
+  }
+  .confirm-card {
+    background:var(--surface);border:1px solid var(--border);
+    border-radius:var(--radius);padding:22px 26px;
+    width:380px;max-width:90vw;box-shadow:0 16px 48px rgba(0,0,0,.4);
+    animation:confirm-in .15s ease-out;
+  }
+  @keyframes confirm-in { from{opacity:0;transform:scale(.95)} to{opacity:1;transform:scale(1)} }
+  .confirm-icon {
+    width:40px;height:40px;border-radius:50%;
+    background:var(--danger-dim);border:1px solid rgba(248,81,73,.25);
+    display:flex;align-items:center;justify-content:center;margin-bottom:14px;
+  }
+  .confirm-title { font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px; }
+  .confirm-desc { font-size:13px;color:var(--text-muted);line-height:1.5;margin-bottom:18px; }
+  .confirm-rule {
+    font-family:var(--mono);font-size:11px;color:var(--text-2);
+    background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:8px 12px;margin-bottom:16px;line-height:1.6;
+  }
+  .confirm-actions { display:flex;gap:8px;justify-content:flex-end; }
+</style>
+
+<!-- ── Page Header ──────────────────────────────────────────── -->
+<div class="page-hdr">
+  <div>
+    <h1 class="page-title">Rules &amp; Topology</h1>
+    <p class="page-sub">{{len .Rules}} active rule{{if ne (len .Rules) 1}}s{{end}} &middot; {{len .Interfaces}} interface{{if ne (len .Interfaces) 1}}s{{end}}</p>
+  </div>
+  <div></div>
+</div>
+{{if eq .DPMode "dpdk"}}
+<div style="background:rgba(88,166,255,.08);border:1px solid rgba(88,166,255,.25);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12.5px;color:var(--text-muted)">
+  <strong style="color:var(--text)">DPDK mode:</strong> ports are addressed by id (the bound NICs are not kernel-visible).
+  {{if .Interfaces}}Ports below are labelled with their PCI address.{{else}}Start the data plane once so it can enumerate ports, or set <code>PB_DPDK_NUM_PORTS</code>.{{end}}
+  The management port is excluded automatically.
+</div>
+{{end}}
+
+<!-- ── Hint (shown during connection workflow) ───────────────── -->
+<div class="topo-hint" id="hint" style="display:none">
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/>
+    <line x1="12" y1="8" x2="12.01" y2="8"/>
+  </svg>
+  <span id="hintText">Click a source port to begin</span>
+  <button class="btn btn-ghost btn-sm" onclick="cancelConnect()" style="margin-left:auto">Cancel</button>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ── TOPOLOGY DIAGRAM ──────────────────────────────────────── -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">Port Diagram</span>
+    <span style="font-size:11px;color:var(--text-muted)">
+      {{if .IsAdmin}}Drag port-to-port to connect &middot; Click line to delete{{else}}View only{{end}}
+    </span>
+  </div>
+  <div class="topo-wrap">
+    <svg id="topo" xmlns="http://www.w3.org/2000/svg"></svg>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><span class="legend-box" style="border:2px solid #58a6ff"></span>Input Port</div>
+  <div class="legend-item"><span class="legend-box" style="border:2px solid #3fb950"></span>Output Port</div>
+  <div class="legend-item"><span class="legend-box" style="border:2px solid #bc8cff"></span>Bidirectional</div>
+  <div class="legend-item"><span class="legend-line" style="border-color:#58a6ff"></span>Manual Rule</div>
+  <div class="legend-item"><span class="legend-line" style="border-color:#f0883e"></span>Mirror</div>
+  <div class="legend-item"><span class="legend-line" style="border-color:#bc8cff"></span>SSL Chain</div>
+  <div class="legend-item"><span class="legend-line" style="border-color:#56d364"></span>Load Balance</div>
+  <div class="legend-item" style="margin-left:auto"><span class="legend-box" style="background:#3fb950;border:none;border-radius:50%;width:10px;height:10px;box-shadow:0 0 5px #3fb950"></span>Link Up</div>
+  <div class="legend-item"><span class="legend-box" style="background:#f85149;border:none;border-radius:50%;width:10px;height:10px"></span>Link Down</div>
+</div>
+
+<hr class="section-sep">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ── RULES TABLE ────────────────────────────────────────────── -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">
+      Rule Details
+      {{if .Rules}}
+        <span style="font-weight:400;color:var(--text-muted);margin-left:4px">({{len .Rules}})</span>
+      {{end}}
+    </span>
+    <div style="display:flex;gap:8px;align-items:center">
+      {{if .Rules}}
+      <div class="search-wrap" style="max-width:220px">
+        <svg class="search-icon" width="13" height="13" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input class="search-input" type="text" id="ruleSearch" placeholder="Search rules…">
+      </div>
+      {{end}}
+      {{if .IsAdmin}}
+      <button class="btn btn-ghost btn-sm" onclick="openModalDirect()" title="Add rule manually">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+        Manual
+      </button>
+      {{end}}
+    </div>
+  </div>
+
+  {{if .Rules}}
+  <div class="table-wrap">
+    <table class="tbl" id="rulesTable">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>In Interface</th>
+          <th>TCP Flags</th>
+          <th>Dest Port</th>
+          <th>Protocol</th>
+          <th>VLAN ID</th>
+          <th>String Match</th>
+          <th>Exclude</th>
+          <th>Out Interface</th>
+          <th>Source</th>
+          {{if .IsAdmin}}<th style="width:70px">Action</th>{{end}}
+        </tr>
+      </thead>
+      <tbody id="rulesBody">
+        {{range .Rules}}
+        <tr data-row>
+          <td style="color:var(--text-muted);font-size:11px">{{.Index}}</td>
+          <td class="mono">{{.InterfaceIn}}</td>
+          <td class="mono">{{.TCPFlags}}</td>
+          <td class="mono">{{.DestPort}}</td>
+          <td class="mono">{{.Protocol}}</td>
+          <td class="mono">{{.VlanID}}</td>
+          <td class="mono">{{.StringMatch}}</td>
+          <td>
+            {{if eq .Exclude "1"}}
+              <span class="badge badge-WARNING">YES</span>
+            {{else}}
+              <span style="color:var(--text-muted);font-size:11px">—</span>
+            {{end}}
+          </td>
+          <td class="mono">{{.InterfaceOut}}</td>
+          <td>{{if .Source}}<span class="badge" style="{{if eq .Source "manual"}}background:var(--primary-dim);color:var(--primary){{else if hasPrefix .Source "mirror:"}}background:rgba(240,136,62,.15);color:#f0883e{{else if hasPrefix .Source "ssl:"}}background:rgba(188,140,255,.15);color:#bc8cff{{else if hasPrefix .Source "lb:"}}background:var(--success-dim);color:var(--success){{else}}background:rgba(255,255,255,.07);color:var(--text-muted){{end}}">{{.Source}}</span>{{else}}<span class="badge" style="background:var(--primary-dim);color:var(--primary)">manual</span>{{end}}</td>
+          {{if $.IsAdmin}}
+          <td style="white-space:nowrap">
+            {{if or (eq .Source "") (eq .Source "manual")}}
+            <button type="button" class="btn btn-ghost btn-sm" title="Edit rule"
+                    onclick="openEditModal({{.Index}})" style="margin-right:4px">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            {{end}}
+            <button type="button" class="btn btn-danger btn-sm" title="Delete rule"
+                    onclick="showConfirmTable({{.Index}},'{{.InterfaceIn}}','{{.InterfaceOut}}')">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+                   stroke="currentColor" stroke-width="2.2"
+                   stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14H6L5 6"/>
+                <path d="M10 11v6M14 11v6"/>
+                <path d="M9 6V4h6v2"/>
+              </svg>
+            </button>
+          </td>
+          {{end}}
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Table pagination -->
+  <div style="padding:12px 16px;border-top:1px solid var(--border-light);display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+    <span class="pager-info" id="rulesPagerInfo"></span>
+    <div class="nav-spacer"></div>
+    <div id="rulesPager" class="flex gap-8" style="align-items:center"></div>
+  </div>
+
+  {{else}}
+  <div class="empty">
+    <div class="empty-txt" style="padding:32px 20px;font-size:13px">
+      No rules configured yet.
+      {{if .IsAdmin}}Click <strong>Add Connection</strong> above to create one.{{end}}
+    </div>
+  </div>
+  {{end}}
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ── ADD CONNECTION MODAL ────────────────────────────────── -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div id="modal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeModal()">
+  <div class="modal-card">
+    <div class="modal-title">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      <span id="modalTitleText">New Connection</span>
+    </div>
+    <div class="modal-ports" id="modalPortsBar">
+      <span class="modal-port-tag" style="background:var(--primary-dim);color:var(--primary)">
+        Source: <strong id="modalSrcLabel">—</strong>
+      </span>
+      <svg width="20" height="14" viewBox="0 0 20 14" style="flex-shrink:0">
+        <line x1="0" y1="7" x2="16" y2="7" stroke="var(--text-muted)" stroke-width="1.5"/>
+        <polyline points="13,3 17,7 13,11" fill="none" stroke="var(--text-muted)" stroke-width="1.5"/>
+      </svg>
+      <span class="modal-port-tag" style="background:var(--success-dim);color:var(--success)">
+        Dest: <strong id="modalDstLabel">—</strong>
+      </span>
+    </div>
+    <!-- Connection Type Selector (hidden in edit mode) -->
+    <div id="modeBar" style="display:flex;gap:6px;margin-bottom:14px">
+      <button type="button" class="btn btn-sm" id="modeRule" onclick="setConnMode('rule')" style="flex:1;background:var(--primary);color:#0d1117">Rule</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="modeMirror" onclick="setConnMode('mirror')" style="flex:1">Mirror</button>
+      <button type="button" class="btn btn-ghost btn-sm" id="modeSSL" onclick="setConnMode('ssl')" style="flex:1">SSL Chain</button>
+    </div>
+
+    <!-- RULE form -->
+    <form action="/add-rule" method="post" id="connForm" style="display:block">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid">
+        <div class="form-group">
+          <label class="form-label">Input Interface *</label>
+          <input class="form-control" name="interface_in" id="fIn" required placeholder="ens33">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Output Interface *</label>
+          <input class="form-control" name="interface_out" id="fOut" required placeholder="ens35">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Protocol</label>
+          <select class="form-control" name="protocol">
+            <option value="0">Any</option>
+            <option value="TCP">TCP</option><option value="UDP">UDP</option><option value="ICMP">ICMP</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Dest Port</label>
+          <input class="form-control" name="dest_port" type="number" value="0" min="0" max="65535">
+        </div>
+      </div>
+
+      <!-- Expandable sections -->
+      <div style="margin-top:12px">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.nextElementSibling.style.display==='none'?'+ Filtering':'- Filtering'" style="font-size:11px;width:100%;text-align:left;border:1px dashed var(--border)">+ Filtering</button>
+        <div style="display:none;margin-top:8px">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Source IP (CIDR)</label><input class="form-control" name="src_ip" value="0" placeholder="192.168.1.0/24"></div>
+            <div class="form-group"><label class="form-label">Dest IP (CIDR)</label><input class="form-control" name="dst_ip" value="0" placeholder="10.0.0.0/8"></div>
+            <div class="form-group"><label class="form-label">Source MAC</label><input class="form-control" name="src_mac" value="0" placeholder="AA:BB:CC:DD:EE:FF"></div>
+            <div class="form-group"><label class="form-label">Dest MAC</label><input class="form-control" name="dst_mac" value="0" placeholder="AA:BB:CC:DD:EE:FF"></div>
+            <div class="form-group"><label class="form-label">TCP Flags</label><input class="form-control" name="tcp_flags" value="0" placeholder="S, SA, F, R"></div>
+            <div class="form-group"><label class="form-label">String Match</label><input class="form-control" name="string_match" value="0" placeholder="payload keyword"></div>
+            <div class="form-group"><label class="form-label">BPF Filter</label><input class="form-control" name="bpf_filter" placeholder="tcp port 80"></div>
+            <div class="form-group"><label class="form-label">Exclude (invert)</label>
+              <select class="form-control" name="exclude"><option value="0">No</option><option value="1">Yes — exclude matching</option></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:6px">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.nextElementSibling.style.display==='none'?'+ VLAN & Slicing':'- VLAN & Slicing'" style="font-size:11px;width:100%;text-align:left;border:1px dashed var(--border)">+ VLAN &amp; Slicing</button>
+        <div style="display:none;margin-top:8px">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">VLAN ID (match)</label><input class="form-control" name="vlan_id" type="number" value="0" min="0" max="4094"></div>
+            <div class="form-group"><label class="form-label">VLAN Action</label>
+              <select class="form-control" name="vlan_action"><option value="none">None</option><option value="add">Add tag</option><option value="remove">Remove tag</option><option value="change">Change ID</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">New VLAN ID</label><input class="form-control" name="vlan_new_id" type="number" value="0" min="0" max="4094"></div>
+            <div class="form-group"><label class="form-label">Truncate (bytes)</label>
+              <select class="form-control" name="truncate"><option value="0">Full packet</option><option value="64">64B (headers only)</option><option value="128">128B (extended)</option><option value="256">256B</option></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="margin-top:6px">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none';this.textContent=this.nextElementSibling.style.display==='none'?'+ Rate Limiting':'- Rate Limiting'" style="font-size:11px;width:100%;text-align:left;border:1px dashed var(--border)">+ Rate Limiting</button>
+        <div style="display:none;margin-top:8px">
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">Max Mbps (0=unlimited)</label><input class="form-control" name="rate_limit_mbps" type="number" value="0" min="0"></div>
+            <div class="form-group"><label class="form-label">Max PPS (0=unlimited)</label><input class="form-control" name="rate_limit_pps" type="number" value="0" min="0"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top:14px">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="connSubmitBtn">Create Rule</button>
+      </div>
+    </form>
+
+    <!-- MIRROR form -->
+    <form action="/mirror" method="post" id="mirrorForm" style="display:none">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div style="padding:10px 14px;background:rgba(240,136,62,.08);border:1px solid rgba(240,136,62,.2);border-radius:var(--radius-sm);margin-bottom:12px;font-size:12px;color:#f0883e">
+        Mirror copies <b>all traffic</b> from source to all destinations (no filtering).
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Session Name *</label><input class="form-control" name="name" required placeholder="TAP Mirror 1"></div>
+        <div class="form-group"><label class="form-label">Source Port *</label><input class="form-control" name="src_port" id="fMirrorSrc" required placeholder="ens33"></div>
+        <div class="form-group" style="grid-column:span 2"><label class="form-label">Destination Ports * (comma-separated)</label><input class="form-control" name="dst_ports" id="fMirrorDst" required placeholder="ens35,ens36,ens37"></div>
+      </div>
+      <div class="modal-actions" style="margin-top:14px">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background:#f0883e">Create Mirror</button>
+      </div>
+    </form>
+
+    <!-- SSL CHAIN form -->
+    <form action="/ssl-decrypt" method="post" id="sslForm" style="display:none">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div style="padding:10px 14px;background:rgba(188,140,255,.08);border:1px solid rgba(188,140,255,.2);border-radius:var(--radius-sm);margin-bottom:12px;font-size:12px;color:#bc8cff">
+        SSL chain routes: Encrypted Port &rarr; Decrypt Tool &rarr; Reinject Port
+      </div>
+      <div class="form-grid">
+        <div class="form-group"><label class="form-label">Chain Name *</label><input class="form-control" name="name" required placeholder="HTTPS Inspection"></div>
+        <div class="form-group"><label class="form-label">Filter (optional)</label><input class="form-control" name="filter" placeholder="tcp port 443"></div>
+        <div class="form-group"><label class="form-label">Encrypted Port *</label><input class="form-control" name="encrypted_port" id="fSSLSrc" required placeholder="ens33"></div>
+        <div class="form-group"><label class="form-label">Decrypt Tool Port *</label><input class="form-control" name="decrypt_tool_port" required placeholder="ens35"></div>
+        <div class="form-group"><label class="form-label">Reinject Port *</label><input class="form-control" name="reinject_port" id="fSSLDst" required placeholder="ens36"></div>
+      </div>
+      <div class="modal-actions" style="margin-top:14px">
+        <button type="button" class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" style="background:#bc8cff;color:#0d1117">Create SSL Chain</button>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<!-- Hidden delete forms for diagram click-to-delete -->
+{{range .Rules}}
+<form id="delForm{{.Index}}" action="/delete-rule" method="post" style="display:none">
+  <input type="hidden" name="csrf_token" value="{{$.CSRFToken}}">
+  <input type="hidden" name="index" value="{{.Index}}">
+</form>
+{{end}}
+
+<!-- Custom confirm dialog -->
+<div id="confirmDlg" class="confirm-overlay" style="display:none" onclick="if(event.target===this)closeConfirm()">
+  <div class="confirm-card">
+    <div class="confirm-icon" id="confirmIcon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--danger)"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14H6L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4h6v2"/>
+      </svg>
+    </div>
+    <div class="confirm-title" id="confirmTitle">Delete Connection</div>
+    <div class="confirm-desc" id="confirmDesc">Are you sure you want to remove this rule? This action cannot be undone.</div>
+    <div class="confirm-rule" id="confirmDetail"></div>
+    <div class="confirm-actions">
+      <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+      <button class="btn btn-primary" id="confirmEditBtn" style="display:none">Edit</button>
+      <button class="btn btn-danger" id="confirmOk" style="background:var(--danger);color:#fff;border-color:var(--danger)">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- ── JAVASCRIPT ──────────────────────────────────────────── -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  'use strict';
+
+  /* ── Config ──────────────────────────────────────────── */
+  /* Real system interfaces from Go (dynamic, not hardcoded) */
+  var sysInterfaces = [{{range .Interfaces}}"{{.}}",{{end}}];
+  /* dpdk mode: id → "port N · PCI" labels (empty for kernel modes) */
+  var sysLabels = { {{range $k, $v := .InterfaceLabels}}"{{$k}}":"{{$v}}",{{end}} };
+
+  /* If no interfaces detected (e.g. macOS dev, or dpdk before first start),
+     show placeholder ids. */
+  if (sysInterfaces.length === 0) sysInterfaces = ['port0','port1','port2','port3'];
+
+  var C = {
+    N: sysInterfaces.length,
+    svgW: 1200,
+    portW: 150, portH: 34, gap: 5,
+    leftX: 20, startY: 46,
+    colors: ['#58a6ff','#3fb950','#f0883e','#bc8cff','#f778ba','#79c0ff','#56d364','#d29922']
+  };
+  C.rightX = C.svgW - C.portW - 20;
+
+  var isAdmin = {{if .IsAdmin}}true{{else}}false{{end}};
+
+  /* ── Rules from server ───────────────────────────────── */
+  var rules = [
+    {{range .Rules}}{
+      idx:{{.Index}},inP:"{{.InterfaceIn}}",outP:"{{.InterfaceOut}}",
+      flags:"{{.TCPFlags}}",dport:"{{.DestPort}}",proto:"{{.Protocol}}",
+      vlan:"{{.VlanID}}",match:"{{.StringMatch}}",excl:"{{.Exclude}}",
+      src:"{{.Source}}",
+      vlanAction:"{{.VlanAction}}",vlanNewId:"{{.VlanNewID}}",truncate:"{{.Truncate}}",
+      srcIp:"{{.SrcIP}}",dstIp:"{{.DstIP}}",srcMac:"{{.SrcMAC}}",dstMac:"{{.DstMAC}}",
+      bpf:"{{.BPFFilter}}"
+    },{{end}}
+  ];
+
+  /* ── Build port arrays from real interfaces ── */
+  var leftPorts=[], rightPorts=[], mapL={}, mapR={};
+  for (var i=0; i<C.N; i++) {
+    var py  = C.startY + i*(C.portH+C.gap);
+    var iface = sysInterfaces[i];
+    var lbl = sysLabels[iface] || iface;
+    leftPorts.push({  id:iface, num:i+1, label:lbl, side:'left',
+                      x:C.leftX,  y:py, cy:py+C.portH/2, connX:C.leftX+C.portW });
+    rightPorts.push({ id:iface, num:i+1, label:lbl, side:'right',
+                      x:C.rightX, y:py, cy:py+C.portH/2, connX:C.rightX });
+    mapL[iface] = leftPorts[i];
+    mapR[iface] = rightPorts[i];
+  }
+  var allPorts = leftPorts.concat(rightPorts);
+
+  var inputSet={}, outputSet={};
+  rules.forEach(function(r){ inputSet[r.inP]=true; outputSet[r.outP]=true; });
+
+  /* ── SVG setup ───────────────────────────────────────── */
+  var svgH = C.startY + C.N*(C.portH+C.gap) + 12;
+  var svg  = document.getElementById('topo');
+  svg.setAttribute('viewBox','0 0 '+C.svgW+' '+svgH);
+  svg.style.height = Math.max(svgH, 200)+'px';
+
+  var h = '';
+
+  // Defs
+  h += '<defs>';
+  h += '<pattern id="g" width="28" height="28" patternUnits="userSpaceOnUse">';
+  h += '<circle cx="14" cy="14" r="0.6" fill="rgba(48,54,61,0.45)"/></pattern>';
+  h += '<filter id="glow"><feGaussianBlur stdDeviation="2" result="b"/>';
+  h += '<feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+  for (var ci=0;ci<C.colors.length;ci++) {
+    h += '<marker id="a'+ci+'" viewBox="0 0 10 7" refX="10" refY="3.5" '+
+         'markerWidth="7" markerHeight="5" orient="auto">'+
+         '<polygon points="0,0 10,3.5 0,7" fill="'+C.colors[ci]+'"/></marker>';
+  }
+  h += '</defs>';
+
+  // Background
+  h += '<rect width="'+C.svgW+'" height="'+svgH+'" fill="var(--bg)"/>';
+  h += '<rect width="'+C.svgW+'" height="'+svgH+'" fill="url(#g)"/>';
+
+  // Column headers
+  h += svgTxt(C.leftX+C.portW/2, 26, 'INPUT  ('+C.N+')','var(--text-muted)',9,700,'middle');
+  h += svgTxt(C.rightX+C.portW/2, 26, 'OUTPUT  ('+C.N+')','var(--text-muted)',9,700,'middle');
+  if (rules.length)
+    h += svgTxt(C.svgW/2, 26, 'CONNECTIONS ('+rules.length+')','var(--text-muted)',9,600,'middle');
+
+  // ── Connections (source from left, dest on right) ──
+  rules.forEach(function(r,ri) {
+    var src = mapL[r.inP];     // source = LEFT side
+    var dst = mapR[r.outP];    // dest   = RIGHT side
+    if (!src||!dst) return;
+    var color = ruleColor(r,ri);
+    var sx=src.connX, sy=src.cy, dx=dst.connX, dy=dst.cy;
+    var mx = (sx+dx)/2;
+    var path = 'M '+sx+' '+sy+' C '+mx+' '+sy+', '+mx+' '+dy+', '+dx+' '+dy;
+    var mid  = bezMid(sx,sy,dx,dy);
+
+    // Glow
+    h += '<path d="'+path+'" fill="none" stroke="'+color+'" stroke-width="5" opacity="0.07"/>';
+    // Animated line
+    h += '<path class="conn-line" d="'+path+'" fill="none" stroke="'+color+
+         '" stroke-width="1.8" stroke-dasharray="7 4" data-idx="'+r.idx+
+         '" marker-end="url(#a'+(ri%C.colors.length)+')"/>';
+    // Wide hit area
+    h += '<path class="conn-hit" d="'+path+'" fill="none" stroke="transparent" stroke-width="12" data-idx="'+r.idx+'"/>';
+
+    // Label pill
+    var label = ruleLabel(r);
+    var tw = label.length*5.5+16;
+    h += '<rect x="'+(mid.x-tw/2)+'" y="'+(mid.y-9)+'" width="'+tw+
+         '" height="16" rx="8" fill="var(--surface)" stroke="'+color+'" stroke-width="0.6" opacity="0.92"/>';
+    h += svgTxt(mid.x, mid.y+3, label, color, 8.5, 600, 'middle');
+  });
+
+  // ── Port nodes (left + right) ──
+  allPorts.forEach(function(p) {
+    var isL  = p.side==='left';
+    var used = isL ? !!inputSet[p.id] : !!outputSet[p.id];
+    var bc   = used ? (isL ? '#58a6ff' : '#3fb950') : '#30363d';
+    var bw   = used ? 1.4 : 0.8;
+
+    h += '<g class="topo-port" data-id="'+p.id+'" data-side="'+p.side+
+         '" style="cursor:pointer" transform="translate('+p.x+','+p.y+')">';
+    // Background
+    h += '<rect width="'+C.portW+'" height="'+C.portH+'" rx="6" '+
+         'fill="var(--surface)" stroke="'+bc+'" stroke-width="'+bw+'"/>';
+
+    // Compact ethernet icon
+    h += '<g transform="translate(7,4)" opacity="0.45">'+
+         '<rect x="0" y="0" width="18" height="22" rx="2" fill="none" stroke="'+bc+'" stroke-width="1"/>'+
+         '<line x1="4" y1="5" x2="4" y2="17" stroke="'+bc+'" stroke-width="0.8"/>'+
+         '<line x1="9" y1="5" x2="9" y2="17" stroke="'+bc+'" stroke-width="0.8"/>'+
+         '<line x1="14" y1="5" x2="14" y2="17" stroke="'+bc+'" stroke-width="0.8"/></g>';
+
+    // Labels
+    h += svgTxt(32, 14, p.label, 'var(--text)', 11, 600);
+    h += svgTxt(32, 26, 'Port '+(p.num), 'var(--text-muted)', 8.5, 400);
+    // Speed badge (placeholder; populated by /api/stats poll using link_info.speed)
+    h += '<text class="port-speed" x="'+(C.portW-8)+'" y="20" fill="'+
+         (used?bc:'var(--text-muted)')+'" font-size="8" font-weight="700" '+
+         'text-anchor="end" style="letter-spacing:0.03em">—</text>';
+
+    // Connector dot
+    if (used) {
+      var cx = isL ? C.portW+1 : -1;
+      h += '<circle cx="'+cx+'" cy="'+(C.portH/2)+'" r="3.5" fill="'+bc+'" filter="url(#glow)"/>';
+    }
+
+    // Link-state LED (top-right of port box, populated by /api/stats poll)
+    h += '<circle class="link-led" data-iface="'+p.id+'" data-side="'+p.side+
+         '" cx="'+(C.portW-22)+'" cy="7" r="3" fill="#6e7681"/>';
+
+    h += '</g>';
+  });
+
+  svg.innerHTML = h;
+
+  /* ── Link state + speed polling (mirrors dashboard behavior) ── */
+  function formatSpeed(mbps) {
+    if (!mbps || mbps < 0) return '—';
+    if (mbps >= 1000) {
+      var g = mbps / 1000;
+      return (g === Math.floor(g) ? g.toFixed(0) : g.toFixed(1)) + 'G';
+    }
+    return mbps + 'M';
+  }
+  function updateLinkInfo() {
+    fetch('/api/stats', {credentials:'same-origin'})
+      .then(function(r){ return r.ok ? r.json() : null; })
+      .then(function(d){
+        if (!d) return;
+        var info = d.link_info || {};
+        document.querySelectorAll('.topo-port').forEach(function(g){
+          var iface = g.dataset.id;
+          var li    = info[iface] || {};
+          var state = li.oper_state || 'unknown';
+          var led   = g.querySelector('.link-led');
+          var spd   = g.querySelector('.port-speed');
+
+          if (led) {
+            var fill, glow;
+            if (state === 'up')        { fill = '#3fb950'; glow = true;  }
+            else if (state === 'down') { fill = '#f85149'; glow = false; }
+            else                       { fill = '#6e7681'; glow = false; }
+            led.setAttribute('fill', fill);
+            if (glow) led.setAttribute('filter', 'url(#glow)');
+            else      led.removeAttribute('filter');
+          }
+          if (spd) {
+            spd.textContent = formatSpeed(li.speed);
+          }
+        });
+      })
+      .catch(function(){});
+  }
+  updateLinkInfo();
+  setInterval(updateLinkInfo, 5000);
+
+  /* ── SVG helpers ─────────────────────────────────────── */
+  function svgTxt(x,y,text,fill,size,weight,anchor) {
+    return '<text x="'+x+'" y="'+y+'" fill="'+fill+'" font-size="'+size+
+           '" font-weight="'+weight+'"'+(anchor?' text-anchor="'+anchor+'"':'')+
+           ' style="letter-spacing:0.03em">'+esc(text)+'</text>';
+  }
+  function esc(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function bezMid(sx,sy,dx,dy) {
+    var mx=(sx+dx)/2, cx1=mx, cy1=sy, cx2=mx, cy2=dy;
+    return { x: 0.125*sx + 0.375*cx1 + 0.375*cx2 + 0.125*dx,
+             y: 0.125*sy + 0.375*cy1 + 0.375*cy2 + 0.125*dy };
+  }
+  function ruleLabel(r) {
+    // Show source badge for subsystem-generated rules
+    if (r.src && r.src.indexOf('mirror:')===0) return 'MIRROR';
+    if (r.src && r.src.indexOf('ssl:')===0) return 'SSL';
+    if (r.src && r.src.indexOf('lb:')===0) return 'LB';
+    if (r.src && r.src.indexOf('dpi:')===0) return 'DPI';
+    var p=[];
+    if (r.proto!=='0'&&r.proto!=='') p.push(r.proto);
+    if (r.dport!=='0'&&r.dport!=='') p.push(':'+r.dport);
+    if (r.vlan!=='0'&&r.vlan!=='')  p.push('VLAN:'+r.vlan);
+    if (r.flags!=='0'&&r.flags!=='') p.push('F:'+r.flags);
+    if (r.match!=='0'&&r.match!=='') p.push('"'+r.match+'"');
+    if (r.excl==='1') p.push('NOT');
+    return p.length?p.join(' '):'All Traffic';
+  }
+
+  /* Color coding by source */
+  function ruleColor(r, ri) {
+    if (r.src && r.src.indexOf('mirror:')===0) return '#f0883e';
+    if (r.src && r.src.indexOf('ssl:')===0) return '#bc8cff';
+    if (r.src && r.src.indexOf('lb:')===0) return '#56d364';
+    if (r.src && r.src.indexOf('dpi:')===0) return '#f778ba';
+    return C.colors[ri%C.colors.length];
+  }
+
+  /* ── Drag-to-connect workflow ──────────────────────────── */
+  var SVG_NS = 'http://www.w3.org/2000/svg';
+  var dragSrc=null, dragLineEl=null, dragPulse=null, dragHover=null, dragging=false;
+
+  function svgPt(e) {
+    var p=svg.createSVGPoint(); p.x=e.clientX; p.y=e.clientY;
+    return p.matrixTransform(svg.getScreenCTM().inverse());
+  }
+  function cancelDrag() {
+    dragSrc=null; dragging=false;
+    if (dragLineEl&&dragLineEl.parentNode) dragLineEl.parentNode.removeChild(dragLineEl); dragLineEl=null;
+    if (dragPulse&&dragPulse.parentNode)  dragPulse.parentNode.removeChild(dragPulse);  dragPulse=null;
+    if (dragHover) { restorePort(dragHover); dragHover=null; }
+    document.getElementById('hint').style.display='none';
+    svg.style.cursor='';
+  }
+  window.closeModal = function() {
+    document.getElementById('modal').style.display='none';
+    cancelDrag();
+  };
+  var connMode = 'rule';
+  window.setConnMode = function(mode) {
+    connMode = mode;
+    document.getElementById('connForm').style.display = mode==='rule'?'block':'none';
+    document.getElementById('mirrorForm').style.display = mode==='mirror'?'block':'none';
+    document.getElementById('sslForm').style.display = mode==='ssl'?'block':'none';
+    // Button styles
+    ['modeRule','modeMirror','modeSSL'].forEach(function(id){
+      var b=document.getElementById(id);
+      b.className='btn btn-ghost btn-sm'; b.style.flex='1'; b.style.background=''; b.style.color='';
+    });
+    var active = mode==='rule'?'modeRule':mode==='mirror'?'modeMirror':'modeSSL';
+    var colors = {rule:'var(--primary)',mirror:'#f0883e',ssl:'#bc8cff'};
+    var btn=document.getElementById(active);
+    btn.style.background=colors[mode]; btn.style.color='#0d1117'; btn.className='btn btn-sm';
+  };
+  /* Reset modal to "add new rule" mode */
+  function resetModalToAdd() {
+    document.getElementById('modalTitleText').textContent = 'New Connection';
+    document.getElementById('connForm').setAttribute('action', '/add-rule');
+    document.getElementById('connSubmitBtn').textContent = 'Create Rule';
+    document.getElementById('modeBar').style.display = 'flex';
+    // Reset all rule form fields to defaults
+    var f = document.getElementById('connForm');
+    f.elements['interface_in'].value = '';
+    f.elements['interface_out'].value = '';
+    f.elements['protocol'].value = '0';
+    f.elements['dest_port'].value = '0';
+    f.elements['src_ip'].value = '0';
+    f.elements['dst_ip'].value = '0';
+    f.elements['src_mac'].value = '0';
+    f.elements['dst_mac'].value = '0';
+    f.elements['tcp_flags'].value = '0';
+    f.elements['string_match'].value = '0';
+    f.elements['bpf_filter'].value = '';
+    f.elements['exclude'].value = '0';
+    f.elements['vlan_id'].value = '0';
+    f.elements['vlan_action'].value = 'none';
+    f.elements['vlan_new_id'].value = '0';
+    f.elements['truncate'].value = '0';
+    if (f.elements['rate_limit_mbps']) f.elements['rate_limit_mbps'].value = '0';
+    if (f.elements['rate_limit_pps'])  f.elements['rate_limit_pps'].value = '0';
+  }
+
+  window.openModalDirect = function() {
+    document.getElementById('modalSrcLabel').textContent='\u2014';
+    document.getElementById('modalDstLabel').textContent='\u2014';
+    resetModalToAdd();
+    setConnMode('rule');
+    document.getElementById('modal').style.display='flex';
+  };
+
+  /* Open the modal in edit mode for the given rule index */
+  window.openEditModal = function(idx) {
+    var rule = null;
+    for (var i=0;i<rules.length;i++) if (rules[i].idx===idx) { rule = rules[i]; break; }
+    if (!rule) return;
+    // Subsystem rules are managed by their owning page; refuse edit here
+    if (rule.src && rule.src !== 'manual') {
+      alert('This rule is managed by "'+rule.src+'" \u2014 edit it from the owning page.');
+      return;
+    }
+
+    document.getElementById('modalTitleText').textContent = 'Edit Rule #'+idx;
+    document.getElementById('connForm').setAttribute('action', '/rules/'+idx+'/edit');
+    document.getElementById('connSubmitBtn').textContent = 'Update Rule';
+    document.getElementById('modeBar').style.display = 'none';
+    document.getElementById('modalSrcLabel').textContent = rule.inP;
+    document.getElementById('modalDstLabel').textContent = rule.outP;
+    setConnMode('rule');
+
+    var f = document.getElementById('connForm');
+    f.elements['interface_in'].value  = rule.inP;
+    f.elements['interface_out'].value = rule.outP;
+    f.elements['protocol'].value      = rule.proto || '0';
+    f.elements['dest_port'].value     = rule.dport || '0';
+    f.elements['src_ip'].value        = rule.srcIp || '0';
+    f.elements['dst_ip'].value        = rule.dstIp || '0';
+    f.elements['src_mac'].value       = rule.srcMac || '0';
+    f.elements['dst_mac'].value       = rule.dstMac || '0';
+    f.elements['tcp_flags'].value     = rule.flags || '0';
+    f.elements['string_match'].value  = rule.match || '0';
+    f.elements['bpf_filter'].value    = rule.bpf || '';
+    f.elements['exclude'].value       = rule.excl || '0';
+    f.elements['vlan_id'].value       = rule.vlan || '0';
+    f.elements['vlan_action'].value   = rule.vlanAction || 'none';
+    f.elements['vlan_new_id'].value   = rule.vlanNewId || '0';
+    f.elements['truncate'].value      = rule.truncate || '0';
+
+    document.getElementById('modal').style.display = 'flex';
+  };
+  /* Fill port fields based on connection mode when drag completes */
+  window.fillModalPorts = function(srcId, dstId) {
+    document.getElementById('fIn').value=srcId;
+    document.getElementById('fOut').value=dstId;
+    document.getElementById('fMirrorSrc').value=srcId;
+    document.getElementById('fMirrorDst').value=dstId;
+    document.getElementById('fSSLSrc').value=srcId;
+    document.getElementById('fSSLDst').value=dstId;
+  };
+
+  function highlightPort(g,color) {
+    var r=g.querySelector('rect');
+    if(r){ r.setAttribute('stroke',color); r.setAttribute('stroke-width','2.2'); }
+  }
+  function restorePort(g) {
+    var r=g.querySelector('rect'); if(!r) return;
+    var pid=g.dataset.id, used=!!outputSet[pid];
+    r.setAttribute('stroke', used?'#3fb950':'#30363d');
+    r.setAttribute('stroke-width', used?'1.4':'0.8');
+  }
+
+  if (isAdmin) {
+    // ── mousedown on left port: start drag ──
+    svg.addEventListener('mousedown', function(e) {
+      var portG=e.target.closest('.topo-port[data-side="left"]');
+      if (!portG) return;
+      e.preventDefault();
+      var pid=portG.dataset.id;
+      dragSrc=mapL[pid]; if(!dragSrc) return;
+      dragging=true;
+
+      // Hint
+      document.getElementById('hint').style.display='flex';
+      document.getElementById('hintText').textContent=
+        dragSrc.label+' ('+dragSrc.id+') \u2192 Release on an output port';
+
+      // Source pulse
+      dragPulse=document.createElementNS(SVG_NS,'circle');
+      dragPulse.setAttribute('cx',dragSrc.connX);
+      dragPulse.setAttribute('cy',dragSrc.cy);
+      dragPulse.setAttribute('r','5');
+      dragPulse.setAttribute('fill','none');
+      dragPulse.setAttribute('stroke','#58a6ff');
+      dragPulse.setAttribute('class','port-pulse');
+      svg.appendChild(dragPulse);
+
+      // Drag line
+      dragLineEl=document.createElementNS(SVG_NS,'path');
+      dragLineEl.setAttribute('fill','none');
+      dragLineEl.setAttribute('stroke','#58a6ff');
+      dragLineEl.setAttribute('stroke-width','2');
+      dragLineEl.setAttribute('stroke-dasharray','6 3');
+      dragLineEl.setAttribute('opacity','0.6');
+      dragLineEl.setAttribute('pointer-events','none');
+      svg.appendChild(dragLineEl);
+
+      // Highlight source
+      highlightPort(portG,'#58a6ff');
+      svg.style.cursor='grabbing';
+    });
+
+    // ── mousemove: update drag line ──
+    svg.addEventListener('mousemove', function(e) {
+      if (!dragging||!dragSrc) { handleTooltip(e); return; }
+
+      var sx=dragSrc.connX, sy=dragSrc.cy;
+      var hPortG=document.elementFromPoint(e.clientX,e.clientY);
+      if (hPortG) hPortG=hPortG.closest('.topo-port[data-side="right"]');
+
+      if (hPortG) {
+        // Snap to target port
+        var dp=mapR[hPortG.dataset.id];
+        if (dp) {
+          var dx=dp.connX, dy=dp.cy, mx=(sx+dx)/2;
+          dragLineEl.setAttribute('d','M '+sx+' '+sy+' C '+mx+' '+sy+', '+mx+' '+dy+', '+dx+' '+dy);
+          dragLineEl.setAttribute('stroke','#3fb950');
+          dragLineEl.setAttribute('opacity','0.9');
+          dragLineEl.setAttribute('stroke-width','2.5');
+        }
+        if (hPortG!==dragHover) {
+          if (dragHover) restorePort(dragHover);
+          dragHover=hPortG;
+          highlightPort(hPortG,'#3fb950');
+        }
+      } else {
+        // Follow cursor
+        var pt=svgPt(e);
+        var mx2=(sx+pt.x)/2;
+        dragLineEl.setAttribute('d','M '+sx+' '+sy+' C '+mx2+' '+sy+', '+mx2+' '+pt.y+', '+pt.x+' '+pt.y);
+        dragLineEl.setAttribute('stroke','#58a6ff');
+        dragLineEl.setAttribute('opacity','0.6');
+        dragLineEl.setAttribute('stroke-width','2');
+        if (dragHover) { restorePort(dragHover); dragHover=null; }
+      }
+    });
+
+    // ── mouseup: finish drag ──
+    document.addEventListener('mouseup', function(e) {
+      if (!dragging||!dragSrc) return;
+      var tgt=document.elementFromPoint(e.clientX,e.clientY);
+      if (tgt) tgt=tgt.closest('.topo-port[data-side="right"]');
+
+      if (tgt) {
+        var dp=mapR[tgt.dataset.id];
+        if (dp) {
+          document.getElementById('modalSrcLabel').textContent=dragSrc.label+' ('+dragSrc.id+')';
+          document.getElementById('modalDstLabel').textContent=dp.label+' ('+dp.id+')';
+          fillModalPorts(dragSrc.id, dp.id);
+          setConnMode('rule');
+          document.getElementById('modal').style.display='flex';
+        }
+      }
+      cancelDrag();
+    });
+
+    // ── click on connection line: delete ──
+    svg.addEventListener('click', function(e) {
+      if (dragging) return;
+      var line=e.target.closest('.conn-line,.conn-hit');
+      if (!line) return;
+      var idx=parseInt(line.dataset.idx);
+      var rule=null;
+      for (var i=0;i<rules.length;i++) if(rules[i].idx===idx){rule=rules[i];break;}
+      showConfirm(idx, rule);
+    });
+  }
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key==='Escape') {
+      if (document.getElementById('confirmDlg').style.display==='flex') closeConfirm();
+      else if (document.getElementById('modal').style.display==='flex') closeModal();
+      else if (dragging) cancelDrag();
+    }
+  });
+
+  /* ── Hover tooltip on connections ────────────────────── */
+  var tip=null;
+  function handleTooltip(e) {
+    var line=e.target.closest('.conn-line,.conn-hit');
+    if (!line){ removeTip(); return; }
+    var idx=parseInt(line.dataset.idx), rule=null;
+    for (var i=0;i<rules.length;i++) if (rules[i].idx===idx){rule=rules[i];break;}
+    if (!rule){removeTip();return;}
+    if (!tip) {
+      tip=document.createElement('div');
+      tip.style.cssText='position:fixed;background:var(--surface);border:1px solid var(--border);'+
+        'border-radius:8px;padding:10px 14px;font-size:11px;color:var(--text-2);pointer-events:none;'+
+        'z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.3);line-height:1.7;max-width:280px';
+      document.body.appendChild(tip);
+    }
+    tip.innerHTML=
+      '<div style="font-weight:700;color:var(--text);margin-bottom:4px">Rule #'+rule.idx+'</div>'+
+      '<div><span style="color:var(--text-muted)">In:</span> '+esc(rule.inP)+'</div>'+
+      '<div><span style="color:var(--text-muted)">Out:</span> '+esc(rule.outP)+'</div>'+
+      '<div><span style="color:var(--text-muted)">Proto:</span> '+esc(rule.proto)+'</div>'+
+      '<div><span style="color:var(--text-muted)">Port:</span> '+esc(rule.dport)+'</div>'+
+      '<div><span style="color:var(--text-muted)">VLAN:</span> '+esc(rule.vlan)+'</div>'+
+      '<div><span style="color:var(--text-muted)">Flags:</span> '+esc(rule.flags)+'</div>'+
+      '<div><span style="color:var(--text-muted)">Match:</span> '+esc(rule.match)+'</div>'+
+      '<div><span style="color:var(--text-muted)">Excl:</span> '+esc(rule.excl)+'</div>'+
+      (isAdmin?'<div style="margin-top:6px;color:var(--primary);font-weight:600">Click to edit or delete</div>':'');
+    tip.style.left=(e.clientX+14)+'px';
+    tip.style.top =(e.clientY+14)+'px';
+  }
+  if (!isAdmin) svg.addEventListener('mousemove', handleTooltip);
+  svg.addEventListener('mouseleave', function(){ removeTip(); if(dragging) cancelDrag(); });
+  function removeTip(){ if(tip&&tip.parentNode)tip.parentNode.removeChild(tip);tip=null; }
+
+  /* ── Custom confirm dialog ──────────────────────────── */
+  var pendingDeleteIdx = null;
+  var pendingEditIdx   = null;
+
+  /* Line-click on diagram: Edit + Delete chooser (or Delete-only for subsystem rules) */
+  window.showConfirm = function(idx, rule) {
+    pendingDeleteIdx = idx;
+    pendingEditIdx   = idx;
+    var detail = '<strong>Rule #'+idx+'</strong><br>';
+    if (rule) {
+      detail += esc(rule.inP)+' \u2192 '+esc(rule.outP);
+      var fl = ruleLabel(rule);
+      if (fl !== 'All Traffic') detail += '<br>Filter: '+esc(fl);
+    }
+    var isManual = !rule || !rule.src || rule.src === 'manual';
+    document.getElementById('confirmTitle').textContent = 'Connection Actions';
+    document.getElementById('confirmDesc').textContent  = isManual
+      ? 'Edit this rule or delete it permanently.'
+      : 'This rule is managed by a subsystem and can only be deleted here.';
+    document.getElementById('confirmDetail').innerHTML = detail;
+    document.getElementById('confirmEditBtn').style.display = isManual ? '' : 'none';
+    document.getElementById('confirmDlg').style.display = 'flex';
+    document.getElementById('confirmOk').focus();
+  };
+
+  window.showConfirmTable = function(idx, inP, outP) {
+    pendingDeleteIdx = idx;
+    pendingEditIdx   = null;
+    document.getElementById('confirmTitle').textContent = 'Delete Connection';
+    document.getElementById('confirmDesc').textContent  = 'Are you sure you want to remove this rule? This action cannot be undone.';
+    document.getElementById('confirmEditBtn').style.display = 'none';
+    document.getElementById('confirmDetail').innerHTML =
+      '<strong>Rule #'+idx+'</strong><br>'+esc(inP)+' \u2192 '+esc(outP);
+    document.getElementById('confirmDlg').style.display = 'flex';
+    document.getElementById('confirmOk').focus();
+  };
+
+  window.closeConfirm = function() {
+    document.getElementById('confirmDlg').style.display = 'none';
+    pendingDeleteIdx = null;
+    pendingEditIdx   = null;
+  };
+
+  document.getElementById('confirmOk').addEventListener('click', function() {
+    if (pendingDeleteIdx !== null) {
+      var f = document.getElementById('delForm'+pendingDeleteIdx);
+      if (f) f.submit();
+    }
+  });
+
+  document.getElementById('confirmEditBtn').addEventListener('click', function() {
+    var idx = pendingEditIdx;
+    closeConfirm();
+    if (idx !== null) openEditModal(idx);
+  });
+
+  /* ══════════════════════════════════════════════════════ */
+  /* ── Table: search + client-side pagination ──────────── */
+  /* ══════════════════════════════════════════════════════ */
+  var PER_PAGE = 15, tblPage = 1, filtered = [];
+  var tbody  = document.getElementById('rulesBody');
+  var search = document.getElementById('ruleSearch');
+  var info   = document.getElementById('rulesPagerInfo');
+  var pager  = document.getElementById('rulesPager');
+
+  if (tbody) {
+    var allRows = Array.from(tbody.querySelectorAll('tr[data-row]'));
+
+    function applyFilter() {
+      var q = search ? search.value.toLowerCase() : '';
+      filtered = allRows.filter(function(r){ return q===''||r.textContent.toLowerCase().indexOf(q)!==-1; });
+      tblPage = 1;
+      renderTable();
+    }
+
+    function renderTable() {
+      var total = filtered.length;
+      var pages = Math.max(1, Math.ceil(total/PER_PAGE));
+      if (tblPage>pages) tblPage=pages;
+      var start = (tblPage-1)*PER_PAGE;
+      var end   = Math.min(start+PER_PAGE, total);
+
+      allRows.forEach(function(r){ r.classList.add('hidden'); });
+      filtered.slice(start,end).forEach(function(r){ r.classList.remove('hidden'); });
+
+      if (info)  info.textContent = total===0?'No matching rules':'Showing '+(start+1)+'\u2013'+end+' of '+total;
+      if (pager) {
+        pager.innerHTML='';
+        if (pages<=1) return;
+        pager.appendChild(mkPg('\u2039', tblPage<=1, function(){ tblPage--;renderTable(); }));
+        var lo=Math.max(1,tblPage-2), hi=Math.min(pages,lo+4);
+        if(hi-lo<4) lo=Math.max(1,hi-4);
+        for(var i=lo;i<=hi;i++){
+          var ii=i;
+          var b=mkPg(String(i),false,function(){ tblPage=this._pg;renderTable(); });
+          b._pg=ii;
+          if(i===tblPage) b.classList.add('on');
+          pager.appendChild(b);
+        }
+        pager.appendChild(mkPg('\u203A', tblPage>=pages, function(){ tblPage++;renderTable(); }));
+      }
+    }
+
+    function mkPg(label,disabled,onClick){
+      var b=document.createElement('button');
+      b.className='pg'+(disabled?' off':'');
+      b.textContent=label; b.type='button';
+      if(!disabled) b.addEventListener('click',onClick);
+      return b;
+    }
+
+    if (search) search.addEventListener('input', applyFilter);
+    applyFilter();
+  }
+
+})();
+</script>
+
+{{template "footer" .}}

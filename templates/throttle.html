@@ -1,0 +1,38 @@
+{{template "header" .}}
+<div class="page-hdr">
+  <div><h1 class="page-title">Bandwidth Throttling</h1><p class="page-sub">Per-port rate limiting (token bucket)</p></div>
+</div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+{{if .IsAdmin}}
+<div class="card">
+  <div class="card-header"><span class="card-title">Add Rate Limit</span></div>
+  <div class="card-body">
+    <form action="/throttle" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:600px">
+        <div class="form-group"><label class="form-label">Port *</label><input class="form-control" name="port" required placeholder="eth0"></div>
+        <div class="form-group"><label class="form-label">Max Mbps (0=unlimited)</label><input class="form-control" name="max_mbps" type="number" value="0" min="0" max="100000"></div>
+        <div class="form-group"><label class="form-label">Max PPS (0=unlimited)</label><input class="form-control" name="max_pps" type="number" value="0" min="0" max="10000000"></div>
+      </div>
+      <div style="margin-top:14px"><button type="submit" class="btn btn-primary">Add Limit</button></div>
+    </form>
+  </div>
+</div>
+{{end}}
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Rate Limits{{if .ThrottleConfigs}} <span style="font-weight:400;color:var(--text-muted)">({{len .ThrottleConfigs}})</span>{{end}}</span></div>
+  {{if .ThrottleConfigs}}
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Port</th><th>Max Mbps</th><th>Max PPS</th><th>Status</th>{{if .IsAdmin}}<th>Actions</th>{{end}}</tr></thead><tbody>
+    {{range .ThrottleConfigs}}<tr{{if not .Enabled}} style="opacity:0.45"{{end}}>
+      <td class="mono">{{.Port}}</td><td class="mono">{{if eq .MaxMbps 0}}unlimited{{else}}{{.MaxMbps}} Mbps{{end}}</td><td class="mono">{{if eq .MaxPPS 0}}unlimited{{else}}{{.MaxPPS}} pps{{end}}</td>
+      <td>{{if .Enabled}}<span class="badge" style="background:var(--success-dim);color:var(--success)">ON</span>{{else}}<span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">OFF</span>{{end}}</td>
+      {{if $.IsAdmin}}<td style="display:flex;gap:4px">
+        <form action="/throttle/{{.ID}}/toggle" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-ghost btn-sm">{{if .Enabled}}Disable{{else}}Enable{{end}}</button></form>
+        <form action="/throttle/{{.ID}}/delete" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-danger btn-sm">Delete</button></form>
+      </td>{{end}}
+    </tr>{{end}}
+  </tbody></table></div>
+  {{else}}<div class="empty"><div class="empty-txt" style="padding:32px">No rate limits configured.</div></div>{{end}}
+</div>
+{{template "footer" .}}

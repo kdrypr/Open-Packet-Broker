@@ -1,0 +1,84 @@
+{{template "header" .}}
+<div class="page-hdr"><div><h1 class="page-title">Application Intelligence</h1><p class="page-sub">L7 protocol detection &amp; application-aware routing</p></div></div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+
+<!-- Protocol Stats -->
+<div class="card">
+  <div class="card-header"><span class="card-title">Detected Protocols</span>
+    <span style="font-size:11px;color:var(--text-muted)">Live detection from broker engine</span>
+  </div>
+  {{if .DPIStats}}
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Protocol</th><th>Category</th><th>Packets</th><th>Bytes</th><th>Risk</th></tr></thead><tbody>
+    {{range .DPIStats}}<tr>
+      <td style="font-weight:600">{{.Name}}</td>
+      <td>{{if eq .Category "ot"}}<span class="badge badge-ERROR">OT/ICS</span>{{else}}<span class="badge badge-INFO">IT</span>{{end}}</td>
+      <td class="mono">{{.Count}}</td><td class="mono">{{.Bytes}}</td>
+      <td>{{if eq .Risk "critical"}}<span class="badge badge-ERROR">CRITICAL</span>{{else if eq .Risk "high"}}<span class="badge badge-WARNING">HIGH</span>{{else if eq .Risk "medium"}}<span class="badge" style="background:var(--primary-dim);color:var(--primary)">MEDIUM</span>{{else}}<span class="badge badge-default">LOW</span>{{end}}</td>
+    </tr>{{end}}
+  </tbody></table></div>
+  {{else}}<div class="empty"><div class="empty-txt" style="padding:24px">No protocols detected yet. Start the broker to begin analysis.</div></div>{{end}}
+</div>
+
+{{if .IsAdmin}}
+<!-- DPI Rules -->
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Application Routing Rules</span></div>
+  <div class="card-body">
+    <form action="/dpi" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:700px">
+        <div class="form-group"><label class="form-label">Name *</label><input class="form-control" name="name" required placeholder="Route Modbus to IDS"></div>
+        <div class="form-group"><label class="form-label">Protocol *</label>
+          <select class="form-control" name="protocol">
+            <optgroup label="OT / ICS">
+              <option value="modbus">Modbus/TCP</option><option value="dnp3">DNP3</option>
+              <option value="s7comm">S7comm (Siemens)</option><option value="enip">EtherNet/IP</option>
+              <option value="bacnet">BACnet</option><option value="opcua">OPC-UA</option>
+              <option value="iec104">IEC 60870-5-104</option><option value="fins">FINS (Omron)</option>
+              <option value="hartip">HART-IP</option><option value="profinet">PROFINET</option>
+            </optgroup>
+            <optgroup label="IT">
+              <option value="http">HTTP</option><option value="tls">TLS/HTTPS</option>
+              <option value="dns">DNS</option><option value="ssh">SSH</option>
+              <option value="smtp">SMTP</option><option value="ftp">FTP</option>
+              <option value="mqtt">MQTT</option><option value="rdp">RDP</option>
+              <option value="smb">SMB</option><option value="snmp">SNMP</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Action</label>
+          <select class="form-control" name="action">
+            <option value="forward">Forward (route to port)</option>
+            <option value="mirror">Mirror (copy to port)</option>
+            <option value="drop">Drop (block)</option>
+            <option value="alert">Alert only</option>
+          </select>
+        </div>
+        <div class="form-group"><label class="form-label">Output Port</label><input class="form-control" name="output_port" placeholder="eth12"></div>
+      </div>
+      <div style="margin-top:14px"><button type="submit" class="btn btn-primary">Create Rule</button></div>
+    </form>
+  </div>
+</div>
+
+{{if .DPIRules}}
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Active DPI Rules <span style="font-weight:400;color:var(--text-muted)">({{len .DPIRules}})</span></span></div>
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Protocol</th><th>Action</th><th>Output</th><th>Status</th><th>Actions</th></tr></thead><tbody>
+    {{range .DPIRules}}<tr{{if not .Enabled}} style="opacity:0.45"{{end}}>
+      <td style="font-weight:500">{{.Name}}</td>
+      <td><span class="badge badge-INFO">{{.Protocol}}</span></td>
+      <td>{{if eq .Action "drop"}}<span class="badge badge-ERROR">DROP</span>{{else if eq .Action "alert"}}<span class="badge badge-WARNING">ALERT</span>{{else}}<span class="badge" style="background:var(--success-dim);color:var(--success)">{{.Action}}</span>{{end}}</td>
+      <td class="mono">{{.OutputPort}}</td>
+      <td>{{if .Enabled}}<span class="badge" style="background:var(--success-dim);color:var(--success)">ON</span>{{else}}<span class="badge badge-default">OFF</span>{{end}}</td>
+      <td style="display:flex;gap:4px">
+        <form action="/dpi/{{.ID}}/toggle" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-ghost btn-sm">{{if .Enabled}}Disable{{else}}Enable{{end}}</button></form>
+        <form action="/dpi/{{.ID}}/delete" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-danger btn-sm">Delete</button></form>
+      </td>
+    </tr>{{end}}
+  </tbody></table></div>
+</div>
+{{end}}
+{{end}}
+{{template "footer" .}}

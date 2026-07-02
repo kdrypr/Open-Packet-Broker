@@ -1,0 +1,427 @@
+{{template "header" .}}
+
+<style>
+  /* ── Dashboard-specific styles ─────────────── */
+  .dash-grid { display:grid; gap:14px; margin-bottom:18px; }
+  .dash-2col { grid-template-columns:1fr 1fr; }
+  .dash-3col { grid-template-columns:1fr 1fr 1fr; }
+  .dash-hero { grid-template-columns:2fr 1fr; }
+  @media(max-width:900px) { .dash-2col,.dash-3col,.dash-hero { grid-template-columns:1fr; } }
+
+  .gauge-card {
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:20px;display:flex;flex-direction:column;align-items:center;gap:8px;
+  }
+  .gauge-card .stat-lbl { text-align:center; }
+
+  .quick-link {
+    display:flex;align-items:center;gap:10px;padding:10px 14px;
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    color:var(--text-2);text-decoration:none;transition:all .12s;font-size:13px;
+  }
+  .quick-link:hover { border-color:var(--primary);color:var(--text);background:var(--surface-2);text-decoration:none; }
+  .quick-link svg { color:var(--text-muted);flex-shrink:0; }
+
+  .traffic-chart { width:100%;height:120px;display:block; }
+  .port-grid { display:grid;grid-template-columns:repeat(auto-fill,minmax(80px,1fr));gap:6px; }
+  .port-dot {
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    padding:8px 4px;border-radius:var(--radius-sm);border:1px solid var(--border);
+    background:var(--surface);font-size:10px;color:var(--text-muted);gap:3px;transition:all .15s;
+  }
+  .port-dot.up { border-color:rgba(63,185,80,.3); }
+  .port-dot.up .port-led { background:var(--success);box-shadow:0 0 6px var(--success); }
+  .port-dot.down { border-color:rgba(248,81,73,.3);opacity:.6; }
+  .port-dot.down .port-led { background:var(--danger); }
+  .port-led { width:8px;height:8px;border-radius:50%;background:var(--text-muted); }
+  .port-name { font-weight:600;font-size:11px;color:var(--text); }
+  .port-speed { font-size:9px; }
+
+  .broker-hero {
+    background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+    padding:24px;display:flex;align-items:center;gap:20px;
+  }
+  .broker-icon {
+    width:56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .broker-icon.running { background:var(--success-dim);color:var(--success); }
+  .broker-icon.stopped { background:var(--danger-dim);color:var(--danger); }
+  .broker-meta { flex:1; }
+  .broker-status { font-size:22px;font-weight:700;line-height:1.2; }
+  .broker-sub { font-size:12px;color:var(--text-muted);margin-top:2px; }
+
+  @keyframes pulse-glow { 0%,100%{opacity:.6} 50%{opacity:1} }
+  .live-dot { width:6px;height:6px;border-radius:50%;background:var(--success);display:inline-block;animation:pulse-glow 2s infinite;margin-right:5px; }
+</style>
+
+{{if .DefaultAdmin}}
+<div style="background:rgba(210,153,34,0.1);border:1px solid rgba(210,153,34,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;font-size:13px;color:#d29922">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+    <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+  </svg>
+  <span>Default credentials active (<strong>admin / admin</strong>). <a href="/profile" style="color:#d29922;text-decoration:underline">Change your password</a> now.</span>
+</div>
+{{end}}
+
+<!-- ═══ Row 1: Hero status + Controls ═══ -->
+<div class="dash-grid dash-hero">
+  <div class="broker-hero">
+    <div class="broker-icon {{.Status}}">
+      {{if eq .Status "running"}}
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      {{else}}
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      {{end}}
+    </div>
+    <div class="broker-meta">
+      <div class="broker-status" style="color:{{if eq .Status "running"}}var(--success){{else}}var(--danger){{end}}">
+        {{if eq .Status "running"}}Broker Running{{else}}Broker Stopped{{end}}
+      </div>
+      <div class="broker-sub">
+        {{if .Uptime}}Uptime: {{.Uptime}}{{else}}System uptime unavailable{{end}}
+        &middot; {{.RuleCount}} active rule{{if ne .RuleCount 1}}s{{end}}
+      </div>
+    </div>
+    <div class="flex gap-8">
+      <form action="/start" method="post">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="submit" class="btn btn-success" {{if eq .Status "running"}}disabled{{end}}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+          Start
+        </button>
+      </form>
+      <form action="/stop" method="post">
+        <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+        <button type="submit" class="btn btn-danger" {{if eq .Status "stopped"}}disabled{{end}}>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="1"/></svg>
+          Stop
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Uptime card -->
+  <div class="gauge-card">
+    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600">System Uptime</div>
+    <div style="font-size:28px;font-weight:700;color:var(--text);line-height:1" id="uptimeVal">{{if .Uptime}}{{.Uptime}}{{else}}—{{end}}</div>
+    <div style="font-size:11px;color:var(--text-muted)">{{.RuleCount}} rules &middot; {{if eq .Status "running"}}<span class="live-dot"></span>live{{else}}offline{{end}}</div>
+  </div>
+</div>
+
+<!-- ═══ Row 2: CPU + Memory gauges + Traffic chart ═══ -->
+<div class="dash-grid dash-3col">
+  <!-- CPU Gauge -->
+  <div class="gauge-card">
+    <svg width="100" height="60" viewBox="0 0 100 60">
+      <path d="M10 55 A40 40 0 0 1 90 55" fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round"/>
+      <path d="M10 55 A40 40 0 0 1 90 55" fill="none"
+            stroke="{{if gt .CPUPercent 80.0}}var(--danger){{else if gt .CPUPercent 50.0}}var(--warning){{else}}var(--success){{end}}"
+            stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="{{printf "%.1f" (gaugeArc .CPUPercent)}},125.66" id="cpuArc"/>
+      <text x="50" y="48" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="700" font-family="var(--font)" id="cpuText">{{printf "%.0f" .CPUPercent}}%</text>
+      <text x="50" y="22" text-anchor="middle" fill="var(--text-muted)" font-size="8" font-weight="600" font-family="var(--font)" letter-spacing=".08em">CPU</text>
+    </svg>
+    <div class="stat-lbl">Processor Usage</div>
+  </div>
+
+  <!-- Memory Gauge -->
+  <div class="gauge-card">
+    <svg width="100" height="60" viewBox="0 0 100 60">
+      <path d="M10 55 A40 40 0 0 1 90 55" fill="none" stroke="var(--border)" stroke-width="8" stroke-linecap="round"/>
+      <path d="M10 55 A40 40 0 0 1 90 55" fill="none"
+            stroke="{{if gt .MemPercent 80.0}}var(--danger){{else if gt .MemPercent 50.0}}var(--warning){{else}}var(--primary){{end}}"
+            stroke-width="8" stroke-linecap="round"
+            stroke-dasharray="{{printf "%.1f" (gaugeArc .MemPercent)}},125.66" id="memArc"/>
+      <text x="50" y="48" text-anchor="middle" fill="var(--text)" font-size="18" font-weight="700" font-family="var(--font)" id="memText">{{printf "%.0f" .MemPercent}}%</text>
+      <text x="50" y="22" text-anchor="middle" fill="var(--text-muted)" font-size="8" font-weight="600" font-family="var(--font)" letter-spacing=".08em">MEM</text>
+    </svg>
+    <div class="stat-lbl" id="memLabel">{{if .MemUsed}}{{.MemUsed}} / {{.MemTotal}}{{else}}Memory Usage{{end}}</div>
+  </div>
+
+  <!-- Live Traffic mini-chart -->
+  <div class="gauge-card" style="justify-content:flex-start;align-items:stretch">
+    <div style="font-size:11px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;text-align:center">Live Traffic</div>
+    <svg class="traffic-chart" id="trafficChart" viewBox="0 0 300 100" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="rxGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--primary)" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="var(--primary)" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="txGrad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--success)" stop-opacity="0.2"/>
+          <stop offset="100%" stop-color="var(--success)" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <polygon id="rxArea" fill="url(#rxGrad)" points="0,100 300,100"/>
+      <polyline id="rxLine" fill="none" stroke="var(--primary)" stroke-width="1.5" points=""/>
+      <polygon id="txArea" fill="url(#txGrad)" points="0,100 300,100"/>
+      <polyline id="txLine" fill="none" stroke="var(--success)" stroke-width="1.5" points=""/>
+    </svg>
+    <div style="display:flex;justify-content:center;gap:16px;font-size:10px;color:var(--text-muted)">
+      <span><span style="color:var(--primary)">&#9644;</span> RX <span id="rxRate" style="font-weight:600;color:var(--text)">—</span></span>
+      <span><span style="color:var(--success)">&#9644;</span> TX <span id="txRate" style="font-weight:600;color:var(--text)">—</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Row 3: Port Status Grid + Quick Links ═══ -->
+<div class="dash-grid dash-2col">
+  <!-- Port Status -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">Port Status</span>
+      <span style="font-size:11px;color:var(--text-muted)" id="portSummary">Loading...</span>
+    </div>
+    <div class="card-body">
+      <div class="port-grid" id="portGrid">
+        <!-- JS populated -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick Access -->
+  <div class="card">
+    <div class="card-header"><span class="card-title">Quick Access</span></div>
+    <div class="card-body" style="display:grid;gap:6px">
+      <a href="/rules" class="quick-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Rules &amp; Topology
+        <span style="margin-left:auto;font-size:20px;font-weight:700;color:var(--primary)">{{.RuleCount}}</span>
+      </a>
+      <a href="/captures" class="quick-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+        Packet Captures
+      </a>
+      <a href="/alerts" class="quick-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        Alerts
+        {{if .UnackedAlerts}}<span class="nav-badge" style="margin-left:auto">{{.UnackedAlerts}}</span>{{end}}
+      </a>
+      <a href="/health-checks" class="quick-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Health Checks
+      </a>
+      {{if .IsAdmin}}
+      <a href="/backups" class="quick-link">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Backups &amp; Config
+      </a>
+      {{end}}
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Row 4: Recent Activity ═══ -->
+<div class="card">
+  <div class="card-header">
+    <span class="card-title"><span class="live-dot"></span>Recent Activity</span>
+    <a href="/logs" class="btn btn-ghost btn-sm">View all logs &rarr;</a>
+  </div>
+  {{if .RecentLogs}}
+  <div class="table-wrap">
+    <table class="tbl">
+      <thead><tr><th style="width:170px">Time</th><th style="width:80px">Level</th><th>Message</th></tr></thead>
+      <tbody>
+        {{range .RecentLogs}}
+        <tr class="log-{{.Level}}">
+          <td class="log-ts">{{.Time}}</td>
+          <td><span class="badge badge-{{if .Level}}{{.Level}}{{else}}default{{end}}">{{if .Level}}{{.Level}}{{else}}LOG{{end}}</span></td>
+          <td class="log-msg">{{.Message}}</td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+  {{else}}
+  <div class="empty"><div class="empty-txt" style="padding:24px">No recent activity.</div></div>
+  {{end}}
+</div>
+
+<!-- ═══ Live update script ═══ -->
+<script>
+(function(){
+  var rxData=[], txData=[], maxPoints=60;
+
+  function fmtBps(b){
+    if(b>=1e9) return (b/1e9).toFixed(1)+' Gbps';
+    if(b>=1e6) return (b/1e6).toFixed(1)+' Mbps';
+    if(b>=1e3) return (b/1e3).toFixed(1)+' Kbps';
+    return b.toFixed(0)+' bps';
+  }
+
+  function drawChart(){
+    var W=300, H=100;
+    if(rxData.length<2) return;
+    var allVals=rxData.concat(txData);
+    var maxVal=Math.max.apply(null,allVals)||1;
+
+    function pts(arr){
+      var s='';
+      for(var i=0;i<arr.length;i++){
+        var x=(i/(maxPoints-1))*W;
+        var y=H-(arr[i]/maxVal)*(H-4)-2;
+        s+=x.toFixed(1)+','+y.toFixed(1)+' ';
+      }
+      return s.trim();
+    }
+    function areaPts(arr){
+      var p=pts(arr);
+      var last=((arr.length-1)/(maxPoints-1))*W;
+      return '0,'+H+' '+p+' '+last.toFixed(1)+','+H;
+    }
+
+    var rl=document.getElementById('rxLine');
+    var ra=document.getElementById('rxArea');
+    var tl=document.getElementById('txLine');
+    var ta=document.getElementById('txArea');
+    if(rl) rl.setAttribute('points',pts(rxData));
+    if(ra) ra.setAttribute('points',areaPts(rxData));
+    if(tl) tl.setAttribute('points',pts(txData));
+    if(ta) ta.setAttribute('points',areaPts(txData));
+
+    var rxEl=document.getElementById('rxRate');
+    var txEl=document.getElementById('txRate');
+    if(rxEl) rxEl.textContent=fmtBps(rxData[rxData.length-1]*8);
+    if(txEl) txEl.textContent=fmtBps(txData[txData.length-1]*8);
+  }
+
+  var portSparkData={}; // per-port sparkline history {iface: [{rx,tx},...]}
+  var portRates={};     // latest rates per port
+
+  function miniSparkSVG(data, w, h, color){
+    if(!data||data.length<2) return '';
+    var max=0;
+    for(var i=0;i<data.length;i++) if(data[i]>max) max=data[i];
+    if(max===0) max=1;
+    var pts='';
+    for(var i=0;i<data.length;i++){
+      var x=(i/(data.length-1))*w;
+      var y=h-(data[i]/max)*(h-2)-1;
+      pts+=x.toFixed(1)+','+y.toFixed(1)+' ';
+    }
+    return '<svg width="'+w+'" height="'+h+'" viewBox="0 0 '+w+' '+h+'" style="display:block;margin:2px auto 0">'+
+      '<polyline points="'+pts.trim()+'" fill="none" stroke="'+color+'" stroke-width="1.2" stroke-linecap="round"/></svg>';
+  }
+
+  // esc HTML-escapes a value before it is concatenated into innerHTML —
+  // defence-in-depth against a maliciously-named interface reaching the DOM.
+  function esc(s){return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+  function updatePorts(info, rates){
+    var grid=document.getElementById('portGrid');
+    var summary=document.getElementById('portSummary');
+    if(!grid) return;
+    if(rates) portRates=rates;
+    var h='', up=0, down=0, total=0;
+    var ports=Object.keys(info).sort();
+    for(var i=0;i<ports.length;i++){
+      var p=info[ports[i]];
+      var name=p.name||ports[i];
+      var state=p.oper_state||'unknown';
+      var cls=state==='up'?'up':state==='down'?'down':'';
+      if(state==='up') up++; else if(state==='down') down++;
+      total++;
+      var spd=p.speed>0?(p.speed>=1000?(p.speed/1000)+'G':p.speed+'M'):'—';
+
+      // Store sparkline data
+      var r=portRates[name];
+      if(!portSparkData[name]) portSparkData[name]=[];
+      if(r) portSparkData[name].push(r.rx_bps+r.tx_bps);
+      if(portSparkData[name].length>30) portSparkData[name].shift();
+
+      var rate='';
+      if(r && (r.rx_bps>0||r.tx_bps>0)){
+        rate='<div style="font-size:8px;color:var(--primary);margin-top:1px">'+fmtBps((r.rx_bps+r.tx_bps)*8)+'</div>';
+      }
+
+      var spark=miniSparkSVG(portSparkData[name], 70, 18, state==='up'?'var(--success)':'var(--text-muted)');
+
+      h+='<div class="port-dot '+cls+'" style="min-width:85px">'+
+         '<div class="port-led"></div>'+
+         '<div class="port-name">'+esc(name)+'</div>'+
+         spark+
+         rate+
+         '<div class="port-speed">'+esc(spd)+'</div></div>';
+    }
+    grid.innerHTML=h||'<span style="color:var(--text-muted);font-size:12px;grid-column:1/-1;text-align:center;padding:20px">No port data (Linux only)</span>';
+    if(summary) summary.textContent=up+' up / '+down+' down / '+total+' total';
+  }
+
+  function gaugeColor(pct, type) {
+    if (pct > 80) return 'var(--danger)';
+    if (pct > 50) return 'var(--warning)';
+    return type === 'mem' ? 'var(--primary)' : 'var(--success)';
+  }
+
+  function fmtBytesHuman(b) {
+    if (b >= 1073741824) return (b/1073741824).toFixed(1)+' GB';
+    if (b >= 1048576) return (b/1048576).toFixed(1)+' MB';
+    if (b >= 1024) return (b/1024).toFixed(1)+' KB';
+    return b+' B';
+  }
+
+  function updateGauges(sys) {
+    var cpu = sys.cpu_percent || 0;
+    var mem = sys.mem_percent || 0;
+    // CPU arc + text
+    // Arc length: half-circle R=40 → pi*40 = 125.66
+    var arcLen = 125.66;
+    var cpuDash = (cpu / 100) * arcLen;
+    var memDash = (mem / 100) * arcLen;
+
+    var cpuArc = document.getElementById('cpuArc');
+    var cpuText = document.getElementById('cpuText');
+    if (cpuArc) { cpuArc.setAttribute('stroke-dasharray', cpuDash.toFixed(1)+','+arcLen); cpuArc.setAttribute('stroke', gaugeColor(cpu,'cpu')); }
+    if (cpuText) cpuText.textContent = Math.round(cpu)+'%';
+    // Memory arc + text
+    var memArc = document.getElementById('memArc');
+    var memText = document.getElementById('memText');
+    if (memArc) { memArc.setAttribute('stroke-dasharray', memDash.toFixed(1)+','+arcLen); memArc.setAttribute('stroke', gaugeColor(mem,'mem')); }
+    if (memText) memText.textContent = Math.round(mem)+'%';
+    // Memory label
+    var memLabel = document.getElementById('memLabel');
+    if (memLabel && sys.mem_used && sys.mem_total) {
+      memLabel.textContent = fmtBytesHuman(sys.mem_used)+' / '+fmtBytesHuman(sys.mem_total);
+    }
+    // Uptime
+    if (sys.uptime) {
+      var uptimeEl = document.getElementById('uptimeVal');
+      if (uptimeEl) uptimeEl.textContent = sys.uptime;
+    }
+  }
+
+  function poll(){
+    // Network stats
+    fetch('/api/stats').then(function(r){return r.json()}).then(function(d){
+      var totalRx=0, totalTx=0;
+      if(d.rates){
+        for(var k in d.rates){
+          totalRx+=d.rates[k].rx_bps||0;
+          totalTx+=d.rates[k].tx_bps||0;
+        }
+      }
+      rxData.push(totalRx); txData.push(totalTx);
+      if(rxData.length>maxPoints) rxData.shift();
+      if(txData.length>maxPoints) txData.shift();
+      drawChart();
+      if(d.link_info) updatePorts(d.link_info, d.rates);
+    }).catch(function(){});
+
+    // System stats (CPU, memory, uptime)
+    fetch('/api/system').then(function(r){return r.json()}).then(function(sys){
+      updateGauges(sys);
+    }).catch(function(){});
+  }
+
+  // Initial port grid
+  updatePorts({});
+
+  // Start polling
+  poll();
+  setInterval(poll, 3000);
+})();
+</script>
+
+{{template "footer" .}}

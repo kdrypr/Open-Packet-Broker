@@ -1,0 +1,42 @@
+{{template "header" .}}
+<div class="page-hdr"><div><h1 class="page-title">License</h1><p class="page-sub">Hardware-locked license management</p></div></div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+
+<div class="card">
+  <div class="card-header">
+    <span class="card-title">License Status</span>
+    {{if .LicenseStatus.Valid}}<span class="badge" style="background:var(--success-dim);color:var(--success);border:1px solid rgba(63,185,80,.2)">ACTIVE</span>
+    {{else if .LicenseStatus.Expired}}<span class="badge badge-ERROR">EXPIRED</span>
+    {{else}}<span class="badge badge-WARNING">UNLICENSED</span>{{end}}
+  </div>
+  <div class="card-body">
+    <div style="display:grid;grid-template-columns:auto 1fr;gap:6px 20px;font-size:13px;max-width:500px">
+      <span style="color:var(--text-muted)">Hardware ID:</span><span class="mono" style="font-size:11px;word-break:break-all">{{.LicenseStatus.HardwareID}}</span>
+      {{if .LicenseStatus.License}}
+      <span style="color:var(--text-muted)">Customer:</span><span style="font-weight:600">{{.LicenseStatus.License.Customer}}</span>
+      <span style="color:var(--text-muted)">Type:</span><span><span class="badge badge-INFO">{{.LicenseStatus.License.Type}}</span></span>
+      <span style="color:var(--text-muted)">Features:</span><span class="mono" style="font-size:11px">{{range .LicenseStatus.License.Features}}<span class="badge" style="background:var(--primary-dim);color:var(--primary);margin-right:4px">{{.}}</span>{{end}}</span>
+      <span style="color:var(--text-muted)">Max Ports:</span><span>{{if eq .LicenseStatus.License.MaxPorts 0}}Unlimited{{else}}{{.LicenseStatus.License.MaxPorts}}{{end}}</span>
+      <span style="color:var(--text-muted)">Expiry:</span><span>{{.LicenseStatus.License.Expiry}}{{if gt .LicenseStatus.DaysLeft 0}} <span style="color:var(--success)">({{.LicenseStatus.DaysLeft}} days left)</span>{{else if eq .LicenseStatus.DaysLeft -1}} <span style="color:var(--success)">(perpetual)</span>{{end}}</span>
+      <span style="color:var(--text-muted)">Issued:</span><span>{{.LicenseStatus.License.IssuedAt}}</span>
+      {{end}}
+      {{if .LicenseStatus.Error}}<span style="color:var(--text-muted)">Status:</span><span style="color:var(--danger)">{{.LicenseStatus.Error}}</span>{{end}}
+    </div>
+  </div>
+</div>
+
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Install License</span></div>
+  <div class="card-body">
+    <form action="/admin/license" method="post" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-group" style="max-width:400px;margin-bottom:14px">
+        <label class="form-label">License Key File (.key)</label>
+        <input class="form-control" type="file" name="file" accept=".key,.json" required>
+      </div>
+      <button type="submit" class="btn btn-primary">Upload &amp; Activate</button>
+    </form>
+  </div>
+</div>
+{{template "footer" .}}

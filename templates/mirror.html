@@ -1,0 +1,38 @@
+{{template "header" .}}
+<div class="page-hdr">
+  <div><h1 class="page-title">Traffic Mirroring (SPAN)</h1><p class="page-sub">Copy traffic from one port to multiple destinations</p></div>
+</div>
+{{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
+{{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
+{{if .IsAdmin}}
+<div class="card">
+  <div class="card-header"><span class="card-title">Create Mirror Session</span></div>
+  <div class="card-body">
+    <form action="/mirror" method="post">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <div class="form-grid" style="max-width:700px">
+        <div class="form-group"><label class="form-label">Name *</label><input class="form-control" name="name" required placeholder="TAP Mirror 1"></div>
+        <div class="form-group"><label class="form-label">Source Port *</label><input class="form-control" name="src_port" required placeholder="eth0"></div>
+        <div class="form-group" style="grid-column:span 2"><label class="form-label">Destination Ports * (comma-separated)</label><input class="form-control" name="dst_ports" required placeholder="eth12,eth13,eth14"></div>
+      </div>
+      <div style="margin-top:14px"><button type="submit" class="btn btn-primary">Create Mirror</button></div>
+    </form>
+  </div>
+</div>
+{{end}}
+<div class="card mt-12">
+  <div class="card-header"><span class="card-title">Mirror Sessions{{if .MirrorSessions}} <span style="font-weight:400;color:var(--text-muted)">({{len .MirrorSessions}})</span>{{end}}</span></div>
+  {{if .MirrorSessions}}
+  <div class="table-wrap"><table class="tbl"><thead><tr><th>Name</th><th>Source</th><th>Destinations</th><th>Status</th>{{if .IsAdmin}}<th>Actions</th>{{end}}</tr></thead><tbody>
+    {{range .MirrorSessions}}<tr{{if not .Enabled}} style="opacity:0.45"{{end}}>
+      <td style="font-weight:500">{{.Name}}</td><td class="mono">{{.SrcPort}}</td><td class="mono">{{join .DstPorts ", "}}</td>
+      <td>{{if .Enabled}}<span class="badge" style="background:var(--success-dim);color:var(--success)">ON</span>{{else}}<span class="badge" style="background:rgba(255,255,255,.07);color:var(--text-muted)">OFF</span>{{end}}</td>
+      {{if $.IsAdmin}}<td style="display:flex;gap:4px">
+        <form action="/mirror/{{.ID}}/toggle" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-ghost btn-sm">{{if .Enabled}}Disable{{else}}Enable{{end}}</button></form>
+        <form action="/mirror/{{.ID}}/delete" method="post" style="display:inline"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><button class="btn btn-danger btn-sm">Delete</button></form>
+      </td>{{end}}
+    </tr>{{end}}
+  </tbody></table></div>
+  {{else}}<div class="empty"><div class="empty-txt" style="padding:32px">No mirror sessions configured.</div></div>{{end}}
+</div>
+{{template "footer" .}}
