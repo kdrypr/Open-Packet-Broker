@@ -1,20 +1,20 @@
 # Packet Broker — Admin & Developer Guide
 
-Kapsamli yonetim, konfigürasyon, lisanslama ve gelistirici kilavuzu.
+Comprehensive administration, configuration, licensing, and developer guide.
 
 ---
 
-## Icindekiler
+## Table of Contents
 
-1. [Kurulum & Derleme](#1-kurulum--derleme)
-2. [Ilk Calistirma](#2-ilk-calistirma)
-3. [Systemd ile Production Deployment](#3-systemd-ile-production-deployment)
-4. [Kullanici Yonetimi & Roller](#4-kullanici-yonetimi--roller)
-5. [Iki Faktorlu Dogrulama (2FA/TOTP)](#5-iki-faktorlu-dogrulama-2fatotp)
-6. [Lisans Sistemi](#6-lisans-sistemi)
-7. [Kural Yonetimi](#7-kural-yonetimi)
-8. [VLAN Manipulasyonu](#8-vlan-manipulasyonu)
-9. [Paket Filtreleme (Genisletilmis)](#9-paket-filtreleme-genisletilmis)
+1. [Installation & Build](#1-installation--build)
+2. [First Run](#2-first-run)
+3. [Production Deployment with systemd](#3-production-deployment-with-systemd)
+4. [User Management & Roles](#4-user-management--roles)
+5. [Two-Factor Authentication (2FA/TOTP)](#5-two-factor-authentication-2fatotp)
+6. [License System](#6-license-system)
+7. [Rule Management](#7-rule-management)
+8. [VLAN Manipulation](#8-vlan-manipulation)
+9. [Packet Filtering (Extended)](#9-packet-filtering-extended)
 10. [Traffic Mirroring (SPAN)](#10-traffic-mirroring-span)
 11. [Load Balancing](#11-load-balancing)
 12. [Bandwidth Throttling](#12-bandwidth-throttling)
@@ -23,45 +23,45 @@ Kapsamli yonetim, konfigürasyon, lisanslama ve gelistirici kilavuzu.
 15. [PCAP Capture](#15-pcap-capture)
 16. [Alert & Monitoring](#16-alert--monitoring)
 17. [Health Checks](#17-health-checks)
-18. [Syslog / SIEM Entegrasyonu](#18-syslog--siem-entegrasyonu)
+18. [Syslog / SIEM Integration](#18-syslog--siem-integration)
 19. [Cluster Mode](#19-cluster-mode)
 20. [Backup & Restore](#20-backup--restore)
 21. [Firmware Update](#21-firmware-update)
 22. [Audit Log](#22-audit-log)
 23. [Log Rotation](#23-log-rotation)
-24. [Tema (Dark/Light)](#24-tema-darklight)
-25. [JSON API Referansi](#25-json-api-referansi)
-26. [Konfigürasyon Dosyalari](#26-konfigürasyon-dosyalari)
-27. [C Binary Teknik Detay](#27-c-binary-teknik-detay)
-28. [Guvenlik Notlari](#28-guvenlik-notlari)
+24. [Theme (Dark/Light)](#24-theme-darklight)
+25. [JSON API Reference](#25-json-api-reference)
+26. [Configuration Files](#26-configuration-files)
+27. [C Binary Technical Details](#27-c-binary-technical-details)
+28. [Security Notes](#28-security-notes)
 29. [Troubleshooting](#29-troubleshooting)
-30. [Gelistirici Referansi](#30-gelistirici-referansi)
+30. [Developer Reference](#30-developer-reference)
 
 ---
 
-## 1. Kurulum & Derleme
+## 1. Installation & Build
 
-### Gereksinimler
+### Requirements
 
-- Go 1.22+ (web UI icin)
-- GCC + libpcap-dev (C binary icin)
-- Linux (production, /proc/net/dev ve /sys/class/net erisimi icin)
-- macOS desteklenir (gelistirme, netstats/sysinfo degrade olur)
+- Go 1.22+ (for the web UI)
+- GCC + libpcap-dev (for the C binary)
+- Linux (production, for access to /proc/net/dev and /sys/class/net)
+- macOS supported (development; netstats/sysinfo degrade)
 
-### Go Web UI Derleme
+### Building the Go Web UI
 
 ```bash
-# Standart build
+# Standard build
 go build -o packet_broker_ui .
 
-# ARM64 cross-compile (embedded donanim icin)
+# ARM64 cross-compile (for embedded hardware)
 GOOS=linux GOARCH=arm64 go build -o packet_broker_ui .
 
-# ARM32 (Raspberry Pi vb.)
+# ARM32 (Raspberry Pi etc.)
 GOOS=linux GOARCH=arm GOARM=7 go build -o packet_broker_ui .
 ```
 
-### C Binary Derleme (libpcap)
+### Building the C Binary (libpcap)
 
 ```bash
 # x86_64 Linux
@@ -71,192 +71,192 @@ gcc -O2 -o packet_broker c_src/packet_broker_libpcap.c -lpcap -lpthread
 aarch64-linux-gnu-gcc -O2 -o packet_broker c_src/packet_broker_libpcap.c -lpcap -lpthread
 ```
 
-### C Binary Derleme (DPDK)
+### Building the C Binary (DPDK)
 
 ```bash
 gcc -O2 -o packet_broker c_src/packet_broker.c $(pkg-config --cflags --libs libdpdk) -lpthread
 
-# Calistirma (root ve hugepages gerekli)
+# Run (root and hugepages required)
 sudo ./packet_broker -l 0-3 -n 4 --
 ```
 
 ---
 
-## 2. Ilk Calistirma
+## 2. First Run
 
 ```bash
-# Calisma dizininde su dosyalar olmali:
+# The following files must be in the working directory:
 # - packet_broker_ui    (Go binary)
 # - packet_broker       (C binary)
-# - templates/          (HTML template klasoru)
+# - templates/          (HTML template folder)
 
 ./packet_broker_ui
 ```
 
-**Varsayilan ayarlar:**
+**Default settings:**
 - Web UI: `http://localhost:8005`
-- Varsayilan kullanici: `admin` / `admin`
-- Otomatik olusturulan dosyalar:
-  - `users.db` — SQLite veritabani (kullanicilar, alertler, backuplar vs.)
-  - `packet_broker.log` — Uygulama logu
-  - `packet_broker.status` — Broker durumu ("running"/"stopped")
-  - `rules.conf` — C binary icin kural dosyasi
-  - `rules_state.json` — Tam kural state'i (JSON)
+- Default user: `admin` / `admin`
+- Automatically created files:
+  - `users.db` — SQLite database (users, alerts, backups, etc.)
+  - `packet_broker.log` — Application log
+  - `packet_broker.status` — Broker status ("running"/"stopped")
+  - `rules.conf` — Rule file for the C binary
+  - `rules_state.json` — Full rule state (JSON)
 
-> **UYARI:** Ilk giriste `admin/admin` sifresini degistirin! Dashboard'da sari uyari gorunecektir.
+> **WARNING:** Change the `admin/admin` password on first login! A yellow warning will appear on the dashboard.
 
 ---
 
-## 3. Systemd ile Production Deployment
+## 3. Production Deployment with systemd
 
-### Dosya Yerlesimi
+### File Layout
 
 ```bash
-# Hedef dizin olustur
+# Create the target directory
 sudo mkdir -p /opt/packet-broker
 sudo cp packet_broker_ui packet_broker /opt/packet-broker/
 sudo cp -r templates/ /opt/packet-broker/
 
-# Systemd service yukle
+# Install the systemd service
 sudo cp deploy/packet-broker.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable packet-broker
 sudo systemctl start packet-broker
 ```
 
-### Service Durumu
+### Service Status
 
 ```bash
 sudo systemctl status packet-broker
-sudo journalctl -u packet-broker -f        # canli log
-sudo systemctl restart packet-broker       # yeniden baslatma
+sudo journalctl -u packet-broker -f        # live log
+sudo systemctl restart packet-broker       # restart
 ```
 
-### Service Konfigürasyonu
+### Service Configuration
 
-Dosya: `/etc/systemd/system/packet-broker.service`
+File: `/etc/systemd/system/packet-broker.service`
 
-| Parametre | Deger | Aciklama |
+| Parameter | Value | Description |
 |---|---|---|
-| `WorkingDirectory` | `/opt/packet-broker` | Calisma dizini |
-| `Restart` | `always` | Her crash'te otomatik yeniden baslat |
-| `RestartSec` | `5` | 5 saniye bekleme |
-| `LimitNOFILE` | `65536` | Dosya descriptor limiti |
-| `GOMAXPROCS` | `4` | Go thread sayisi |
-| `ProtectSystem` | `strict` | Sadece ReadWritePaths yazilabilir |
-| `NoNewPrivileges` | `true` | Privilege escalation engellenir |
+| `WorkingDirectory` | `/opt/packet-broker` | Working directory |
+| `Restart` | `always` | Automatically restart on every crash |
+| `RestartSec` | `5` | 5-second wait |
+| `LimitNOFILE` | `65536` | File descriptor limit |
+| `GOMAXPROCS` | `4` | Go thread count |
+| `ProtectSystem` | `strict` | Only ReadWritePaths are writable |
+| `NoNewPrivileges` | `true` | Privilege escalation is blocked |
 
 ---
 
-## 4. Kullanici Yonetimi & Roller
+## 4. User Management & Roles
 
-### Roller
+### Roles
 
-| Rol | Yetkiler |
+| Role | Permissions |
 |---|---|
-| `admin` | Tum islemler: kural ekleme/silme, kullanici yonetimi, sistem ayarlari |
-| `user` | Salt okunur: dashboard, kurallar (silme/ekleme yok), operasyonel loglar |
+| `admin` | All operations: adding/deleting rules, user management, system settings |
+| `user` | Read-only: dashboard, rules (no delete/add), operational logs |
 
-### Kullanici Islemleri (Web UI → Users)
+### User Operations (Web UI → Users)
 
-- **Ekleme:** Kullanici adi, sifre (min 8 karakter), rol secimi
-- **Sifre degistirme:** Admin herhangi bir kullanicinin sifresini degistirebilir
-- **Silme:** Son admin hesabi silinemez, admin kendini silemez
+- **Add:** Username, password (min 8 characters), role selection
+- **Change password:** Admin can change any user's password
+- **Delete:** The last admin account cannot be deleted; an admin cannot delete themselves
 
-### Session & Guvenlik
+### Session & Security
 
-| Parametre | Deger |
+| Parameter | Value |
 |---|---|
-| Session suresi | 24 saat |
+| Session duration | 24 hours |
 | Cookie | `HttpOnly`, `SameSite=Strict` |
-| Sifre hashleme | bcrypt, cost=12 |
-| Login rate limit | 5 deneme/dakika/IP |
-| CSRF korumasi | Session-based token, constant-time karsilastirma |
-| Zamanlama saldirisi | Mevcut olmayan kullanicilarda da bcrypt calistirilir |
+| Password hashing | bcrypt, cost=12 |
+| Login rate limit | 5 attempts/minute/IP |
+| CSRF protection | Session-based token, constant-time comparison |
+| Timing attack | bcrypt is run even for nonexistent users |
 
 ---
 
-## 5. Iki Faktorlu Dogrulama (2FA/TOTP)
+## 5. Two-Factor Authentication (2FA/TOTP)
 
-### Etkinlestirme
+### Enabling
 
-1. **Profile** sayfasina git
-2. "Two-Factor Authentication" bolumunde gizli anahtari gör
-3. Google Authenticator veya Authy uygulamasina ekle
-4. Uygulamadaki 6 haneli kodu gir ve **Verify & Enable** tikla
+1. Go to the **Profile** page
+2. View the secret key in the "Two-Factor Authentication" section
+3. Add it to the Google Authenticator or Authy app
+4. Enter the 6-digit code from the app and click **Verify & Enable**
 
-### Teknik Detaylar
+### Technical Details
 
-| Parametre | Deger |
+| Parameter | Value |
 |---|---|
-| Algoritma | HMAC-SHA1 (RFC 6238) |
-| Kod uzunlugu | 6 hane |
-| Periyot | 30 saniye |
-| Tolerans | ±1 adim (±30 saniye) |
-| Gizli anahtar | 160-bit, Base32 kodlu |
+| Algorithm | HMAC-SHA1 (RFC 6238) |
+| Code length | 6 digits |
+| Period | 30 seconds |
+| Tolerance | ±1 step (±30 seconds) |
+| Secret key | 160-bit, Base32 encoded |
 
-### QR URI Formati
+### QR URI Format
 
 ```
 otpauth://totp/PacketBroker:username?secret=BASE32SECRET&issuer=PacketBroker&digits=6&period=30
 ```
 
-### Devre Disi Birakma
+### Disabling
 
 Profile → Two-Factor Authentication → **Disable 2FA**
 
 ---
 
-## 6. Lisans Sistemi
+## 6. License System
 
-### Genel Bakis
+### Overview
 
-Lisans sistemi Ed25519 dijital imza tabanlidir. Her cihazin benzersiz bir Hardware ID'si vardir. Lisans bu ID'ye kilitlenir.
+The license system is based on Ed25519 digital signatures. Every device has a unique Hardware ID. The license is locked to this ID.
 
-### Adim 1: Vendor Anahtar Cifti Olusturma (BIR KERE)
+### Step 1: Generate the Vendor Key Pair (ONE TIME)
 
 ```bash
 go run cmd/keygen/main.go -generate-keys
 ```
 
-Cikti:
+Output:
 ```
 === Ed25519 Key Pair ===
 
 PUBLIC KEY (embed in license.go vendorPubKeyHex):
-a1b2c3d4e5f6...  (64 hex karakter)
+a1b2c3d4e5f6...  (64 hex characters)
 
 PRIVATE KEY (keep SECRET, use for signing):
-f6e5d4c3b2a1...  (128 hex karakter)
+f6e5d4c3b2a1...  (128 hex characters)
 ```
 
-> **KRITIK:** Private key'i guvenli bir yerde saklayin. Public key'i `internal/license/license.go` dosyasindaki `vendorPubKeyHex` degiskenine yapisitirin ve yeniden derleyin.
+> **CRITICAL:** Store the private key in a secure location. Paste the public key into the `vendorPubKeyHex` variable in the `internal/license/license.go` file and rebuild.
 
-### Adim 2: Public Key'i Binary'ye Gomme
+### Step 2: Embed the Public Key into the Binary
 
-Dosya: `internal/license/license.go`, satir ~67:
+File: `internal/license/license.go`, around line 67:
 
 ```go
-var vendorPubKeyHex = "a1b2c3d4e5f6..."  // 64 hex karakter
+var vendorPubKeyHex = "a1b2c3d4e5f6..."  // 64 hex characters
 ```
 
-Degistirdikten sonra yeniden derleyin:
+After changing it, rebuild:
 ```bash
 go build -o packet_broker_ui .
 ```
 
-### Adim 3: Musteri Hardware ID'sini Alma
+### Step 3: Obtain the Customer's Hardware ID
 
-Musterinin cihazinda:
+On the customer's device:
 ```bash
-./packet_broker_ui  # baslatip web UI'dan System → License sayfasina bakin
-# veya
+./packet_broker_ui  # start it and check the System → License page in the web UI
+# or
 go run cmd/keygen/main.go -hwid
 ```
 
-Hardware ID ornegi: `a7f3c92b1d4e8f0612345678abcdef90` (32 hex karakter)
+Hardware ID example: `a7f3c92b1d4e8f0612345678abcdef90` (32 hex characters)
 
-### Adim 4: Lisans Olusturma
+### Step 4: Generate the License
 
 ```bash
 go run cmd/keygen/main.go -sign \
@@ -270,29 +270,29 @@ go run cmd/keygen/main.go -sign \
   -out license.key
 ```
 
-### Lisans Parametreleri
+### License Parameters
 
-| Parametre | Aciklama | Ornekler |
+| Parameter | Description | Examples |
 |---|---|---|
-| `-privkey` | Vendor private key (128 hex) | Zorunlu |
-| `-hardware-id` | Hedef cihaz HWID (32 hex) | Bos birak = tum cihazlar |
-| `-customer` | Musteri adi | "ACME Corp" |
-| `-type` | Lisans tipi | `trial`, `standard`, `enterprise` |
-| `-features` | Ozellik listesi (virgul ayrimli) | `all` veya `mirror,ssl,cluster,dedup,throttle` |
-| `-ports` | Maksimum port sayisi | `24`, `48`, `0` (sinirdiz) |
-| `-expiry` | Son kullanma tarihi | `2027-01-01` veya `perpetual` |
-| `-out` | Cikti dosya yolu | `license.key` |
+| `-privkey` | Vendor private key (128 hex) | Required |
+| `-hardware-id` | Target device HWID (32 hex) | Leave empty = all devices |
+| `-customer` | Customer name | "ACME Corp" |
+| `-type` | License type | `trial`, `standard`, `enterprise` |
+| `-features` | Feature list (comma-separated) | `all` or `mirror,ssl,cluster,dedup,throttle` |
+| `-ports` | Maximum number of ports | `24`, `48`, `0` (unlimited) |
+| `-expiry` | Expiration date | `2027-01-01` or `perpetual` |
+| `-out` | Output file path | `license.key` |
 
-### Adim 5: Lisansi Yukleme
+### Step 5: Upload the License
 
-1. Web UI → System → **License** sayfasi
-2. **Upload & Activate** ile `license.key` dosyasini yukle
-3. Lisans durumu ve detaylari gorunecektir
+1. Web UI → System → **License** page
+2. Upload the `license.key` file with **Upload & Activate**
+3. The license status and details will be displayed
 
-### Ornek Lisanslar
+### Example Licenses
 
 ```bash
-# Trial (30 gun, sinirli ozellikler)
+# Trial (30 days, limited features)
 go run cmd/keygen/main.go -sign \
   -privkey "$PRIVKEY" \
   -hardware-id "$HWID" \
@@ -302,7 +302,7 @@ go run cmd/keygen/main.go -sign \
   -ports 8 \
   -expiry "2026-04-28"
 
-# Enterprise (sinirsiz, tum ozellikler, perpetual)
+# Enterprise (unlimited, all features, perpetual)
 go run cmd/keygen/main.go -sign \
   -privkey "$PRIVKEY" \
   -customer "BigCorp Inc" \
@@ -321,17 +321,17 @@ go run cmd/keygen/main.go -sign \
   -expiry "2026-12-31"
 ```
 
-### Hardware ID Nasil Hesaplaniyor?
+### How Is the Hardware ID Computed?
 
-Sirayla su kaynaklardan SHA256 hash alinir:
-1. Tum MAC adresleri (sirali, loopback haric)
-2. `/etc/machine-id` veya `/var/lib/dbus/machine-id`
-3. `/sys/class/dmi/id/product_serial` (OEM metni haric)
-4. Fallback: hostname + CPU mimarisi + OS
+A SHA256 hash is taken sequentially from the following sources:
+1. All MAC addresses (sorted, loopback excluded)
+2. `/etc/machine-id` or `/var/lib/dbus/machine-id`
+3. `/sys/class/dmi/id/product_serial` (OEM text excluded)
+4. Fallback: hostname + CPU architecture + OS
 
-Sonuc: ilk 16 byte → 32 hex karakter
+Result: first 16 bytes → 32 hex characters
 
-### Lisans Dosya Formati
+### License File Format
 
 ```json
 {
@@ -340,7 +340,7 @@ Sonuc: ilk 16 byte → 32 hex karakter
 }
 ```
 
-Payload decode edildiginde:
+When the payload is decoded:
 ```json
 {
   "hardware_id": "a7f3c92b...",
@@ -355,75 +355,75 @@ Payload decode edildiginde:
 
 ---
 
-## 7. Kural Yonetimi
+## 7. Rule Management
 
-### Kural Ekleme Yontemleri
+### Rule Adding Methods
 
-1. **Topology Drag-and-Drop:** Sol porttan sag porta surukle-birak
-2. **Manual Modal:** Rules sayfasinda "Manual" butonu
+1. **Topology Drag-and-Drop:** Drag and drop from a left port to a right port
+2. **Manual Modal:** The "Manual" button on the Rules page
 3. **JSON API:** `POST /add-rule` (form data)
 
-### Kural Alanlari (22 alan)
+### Rule Fields (22 fields)
 
-| # | Alan | Tip | Varsayilan | Aciklama |
+| # | Field | Type | Default | Description |
 |---|---|---|---|---|
-| 1 | `interface_in` | string | - | Giris interface'i (eth0, eth1...) |
-| 2 | `tcp_flags` | string | "0" | TCP bayraklari: S(YN), A(CK), F(IN), R(ST), P(USH), U(RG) |
-| 3 | `dest_port` | string | "0" | Hedef port (0 = hepsi) |
-| 4 | `protocol` | string | "0" | TCP, UDP, ICMP (0 = hepsi) |
-| 5 | `vlan_id` | string | "0" | VLAN ID filtresi (0 = hepsi) |
-| 6 | `string_match` | string | "0" | Payload'da string arama |
-| 7 | `exclude` | string | "0" | "1" = eslesen paketleri HARIC tut |
-| 8 | `interface_out` | string | - | Cikis interface'i |
-| 9 | `enabled` | bool | true | Kural aktif mi |
-| 10 | `priority` | int | auto | Oncelik (0 = en yuksek) |
+| 1 | `interface_in` | string | - | Input interface (eth0, eth1...) |
+| 2 | `tcp_flags` | string | "0" | TCP flags: S(YN), A(CK), F(IN), R(ST), P(USH), U(RG) |
+| 3 | `dest_port` | string | "0" | Destination port (0 = all) |
+| 4 | `protocol` | string | "0" | TCP, UDP, ICMP (0 = all) |
+| 5 | `vlan_id` | string | "0" | VLAN ID filter (0 = all) |
+| 6 | `string_match` | string | "0" | String search in the payload |
+| 7 | `exclude` | string | "0" | "1" = EXCLUDE matching packets |
+| 8 | `interface_out` | string | - | Output interface |
+| 9 | `enabled` | bool | true | Whether the rule is active |
+| 10 | `priority` | int | auto | Priority (0 = highest) |
 | 11 | `vlan_action` | string | "none" | none, add, remove, change |
-| 12 | `vlan_new_id` | string | "0" | Hedef VLAN ID (add/change icin) |
-| 13 | `truncate` | string | "0" | Paket kesme (byte), 0 = tam |
-| 14 | `src_ip` | string | "0" | Kaynak IP (CIDR: 192.168.1.0/24) |
-| 15 | `dst_ip` | string | "0" | Hedef IP (CIDR) |
-| 16 | `src_mac` | string | "0" | Kaynak MAC (AA:BB:CC:DD:EE:FF) |
-| 17 | `dst_mac` | string | "0" | Hedef MAC |
-| 18 | `bpf_filter` | string | "" | BPF filtre ifadesi |
-| 19 | `rate_limit_mbps` | string | "0" | Bant genisligi limiti (Mbps) |
-| 20 | `rate_limit_pps` | string | "0" | Paket hizi limiti (pps) |
-| 21 | `mirror_ports` | string | "" | Ek cikis portlari (virgul ayrimli) |
-| 22 | `dedup_key` | string | "0" | Dedup grubu anahtari |
+| 12 | `vlan_new_id` | string | "0" | Target VLAN ID (for add/change) |
+| 13 | `truncate` | string | "0" | Packet truncation (bytes), 0 = full |
+| 14 | `src_ip` | string | "0" | Source IP (CIDR: 192.168.1.0/24) |
+| 15 | `dst_ip` | string | "0" | Destination IP (CIDR) |
+| 16 | `src_mac` | string | "0" | Source MAC (AA:BB:CC:DD:EE:FF) |
+| 17 | `dst_mac` | string | "0" | Destination MAC |
+| 18 | `bpf_filter` | string | "" | BPF filter expression |
+| 19 | `rate_limit_mbps` | string | "0" | Bandwidth limit (Mbps) |
+| 20 | `rate_limit_pps` | string | "0" | Packet rate limit (pps) |
+| 21 | `mirror_ports` | string | "" | Additional output ports (comma-separated) |
+| 22 | `dedup_key` | string | "0" | Dedup group key |
 
-### Kural Siralama
+### Rule Ordering
 
-- Kurallar oncelik sirasina gore islenilir (Priority alani)
-- Web UI'da drag-and-drop ile siralama yapilabilir
+- Rules are processed in priority order (the Priority field)
+- Ordering can be done via drag-and-drop in the Web UI
 - `POST /rules/reorder` JSON body: `{"order":[2,0,1,3]}`
 
-### Kural Enable/Disable
+### Rule Enable/Disable
 
-- Her kural aktif/pasif yapilabilir
-- Pasif kurallar `rules.conf`'a yazilmaz (C binary gormez)
-- `POST /rules/{index}/toggle` ile degistirilir
+- Each rule can be made active/inactive
+- Inactive rules are not written to `rules.conf` (the C binary does not see them)
+- Toggled via `POST /rules/{index}/toggle`
 
-### Dosya Yapisi
+### File Structure
 
 ```
-rules_state.json  ← Kaynak (JSON, tum alanlar, disabled dahil)
+rules_state.json  ← Source (JSON, all fields, including disabled)
        ↓ writeCSV()
-rules.conf        ← Turetilmis (22 alan CSV, sadece enabled kurallar)
-       ↓ C binary okur
-packet_broker     ← Paket isleme
+rules.conf        ← Derived (22-field CSV, only enabled rules)
+       ↓ read by the C binary
+packet_broker     ← Packet processing
 ```
 
 ---
 
-## 8. VLAN Manipulasyonu
+## 8. VLAN Manipulation
 
-| Aksiyon | Aciklama | Paket Degisimi |
+| Action | Description | Packet Change |
 |---|---|---|
-| `none` | Degisiklik yok | — |
-| `add` | VLAN tag ekle | 4 byte 802.1Q header eklenir |
-| `remove` | VLAN tag cikar | 4 byte 802.1Q header silinir |
-| `change` | VLAN ID degistir | TCI alanindaki VID degisir, priority korunur |
+| `none` | No change | — |
+| `add` | Add VLAN tag | A 4-byte 802.1Q header is added |
+| `remove` | Remove VLAN tag | A 4-byte 802.1Q header is removed |
+| `change` | Change VLAN ID | The VID in the TCI field changes, priority is preserved |
 
-**802.1Q Frame yapisi:**
+**802.1Q frame structure:**
 ```
 [Dst MAC 6B][Src MAC 6B][0x8100 2B][TCI 2B][EtherType 2B][Payload...]
                                      ↑
@@ -432,153 +432,153 @@ packet_broker     ← Paket isleme
 
 ---
 
-## 9. Paket Filtreleme (Genisletilmis)
+## 9. Packet Filtering (Extended)
 
-### IP Filtresi (CIDR destekli)
+### IP Filter (CIDR supported)
 ```
-src_ip = 192.168.1.0/24    # 192.168.1.0 - 192.168.1.255 arasi
-dst_ip = 10.0.0.1           # tek IP (/32 varsayilan)
+src_ip = 192.168.1.0/24    # between 192.168.1.0 - 192.168.1.255
+dst_ip = 10.0.0.1           # single IP (/32 default)
 ```
 
-### MAC Filtresi
+### MAC Filter
 ```
 src_mac = AA:BB:CC:DD:EE:FF
 dst_mac = 00:11:22:33:44:55
 ```
 
-### TCP Bayrak Kombinasyonlari
+### TCP Flag Combinations
 ```
-S     = SYN (baglanti baslangici)
-SA    = SYN+ACK (baglanti kabulu)
+S     = SYN (connection start)
+SA    = SYN+ACK (connection accepted)
 A     = ACK
-F     = FIN (baglanti kapanisi)
-R     = RST (sifirlama)
-P     = PSH (veri itme)
+F     = FIN (connection close)
+R     = RST (reset)
+P     = PSH (data push)
 ```
 
-### Paket Truncation Onerilen Degerler
+### Recommended Packet Truncation Values
 ```
-64    = Sadece Ethernet + IP header
-128   = Header + bazi TCP/UDP bilgisi
-256   = Cogu header icin yeterli
-0     = Tam paket (varsayilan)
+64    = Only Ethernet + IP header
+128   = Header + some TCP/UDP information
+256   = Sufficient for most headers
+0     = Full packet (default)
 ```
 
 ---
 
 ## 10. Traffic Mirroring (SPAN)
 
-Tek bir giris portundan gelen tum trafigi N hedef porta kopyalar.
+Copies all traffic coming from a single input port to N destination ports.
 
-**Olusturma:** Network → Mirror / SPAN
-- **Kaynak port:** Trafigi dinlenecek interface
-- **Hedef portlar:** Virgul ayrimli cikis portlari
+**Creation:** Network → Mirror / SPAN
+- **Source port:** The interface whose traffic will be monitored
+- **Destination ports:** Comma-separated output ports
 
-**Ornek:** `eth0` → `eth12, eth13, eth14` (3 tool'a kopyala)
+**Example:** `eth0` → `eth12, eth13, eth14` (copy to 3 tools)
 
-Her src→dst cifti icin otomatik olarak bir kural olusturulur (filtre yok = tum trafik).
+A rule is automatically created for each src→dst pair (no filter = all traffic).
 
 ---
 
 ## 11. Load Balancing
 
-| Mod | Aciklama |
+| Mode | Description |
 |---|---|
-| Round-Robin | Paketler sirayla dagilir |
-| Hash | Kaynak/hedef IP hash'ine gore dagitilir |
+| Round-Robin | Packets are distributed in turn |
+| Hash | Distributed by source/destination IP hash |
 
-**Olusturma:** Network → Load Balance
-- Grup adi, mod, giris portlari, cikis portlari
+**Creation:** Network → Load Balance
+- Group name, mode, input ports, output ports
 
 ---
 
 ## 12. Bandwidth Throttling
 
-Token bucket algoritmasiyla per-rule rate limiting.
+Per-rule rate limiting with the token bucket algorithm.
 
-| Parametre | Aciklama |
+| Parameter | Description |
 |---|---|
-| Max Mbps | Bant genisligi siniri (0 = limitsiz) |
-| Max PPS | Paket/saniye siniri (0 = limitsiz) |
-| Burst | 2x rate (otomatik) |
+| Max Mbps | Bandwidth limit (0 = unlimited) |
+| Max PPS | Packets/second limit (0 = unlimited) |
+| Burst | 2x rate (automatic) |
 
-C binary'de `CLOCK_MONOTONIC` tabanli token refill yapilir.
+Token refill based on `CLOCK_MONOTONIC` is performed in the C binary.
 
 ---
 
 ## 13. Packet Deduplication
 
-Ayni paketi birden fazla TAP'tan alirsa sadece ilkini iletir.
+If it receives the same packet from more than one TAP, it forwards only the first one.
 
-| Parametre | Varsayilan | Aciklama |
+| Parameter | Default | Description |
 |---|---|---|
-| Window | 100 ms | Tekrar algilama suresi |
-| Hash Bytes | 128 | Paketin kac byte'i hashlenecek |
-| Tablo boyutu | 65536 entry | CRC32 hash tablosu |
+| Window | 100 ms | Duplicate detection duration |
+| Hash Bytes | 128 | How many bytes of the packet are hashed |
+| Table size | 65536 entries | CRC32 hash table |
 
-**Konfigürasyon:** `dedup.conf` dosyasi C binary tarafindan okunur.
+**Configuration:** The `dedup.conf` file is read by the C binary.
 Format: `port,enabled,window_ms,hash_bytes` (port `*` = global)
 
 ---
 
 ## 14. SSL/TLS Inspection
 
-Sifrelenmis trafigi decryption appliance'a yonlendirir.
+Redirects encrypted traffic to a decryption appliance.
 
-**Zincir yapisi:**
+**Chain structure:**
 ```
 Encrypted Port → Decrypt Tool Port → Reinject Port
      eth0     →       eth12        →     eth13
 ```
 
-Her zincir 2 kural olusturur:
-1. `eth0` → `eth12` (sifrelenmis trafigi tool'a gonder)
-2. `eth12` → `eth13` (cozulmus trafigi geri enjekte et)
+Each chain creates 2 rules:
+1. `eth0` → `eth12` (send encrypted traffic to the tool)
+2. `eth12` → `eth13` (reinject the decrypted traffic)
 
 ---
 
 ## 15. PCAP Capture
 
-tcpdump ile paket yakalama.
+Packet capture with tcpdump.
 
-| Sinir | Deger |
+| Limit | Value |
 |---|---|
-| Maks es zamanli | 3 capture |
-| Maks sure | 300 saniye |
-| Varsayilan sure | 60 saniye |
-| Maks paket | 100,000 |
+| Max concurrent | 3 captures |
+| Max duration | 300 seconds |
+| Default duration | 60 seconds |
+| Max packets | 100,000 |
 
-**Calistirilan komut:**
+**Command executed:**
 ```bash
 tcpdump -i <iface> -w <path>.pcap -c 100000 [bpf_filter]
 ```
 
-Yakalanan dosyalar `captures/` klasorunde saklanir.
+Captured files are stored in the `captures/` folder.
 
 ---
 
 ## 16. Alert & Monitoring
 
-### Desteklenen Metrikler
+### Supported Metrics
 
-| Metrik | Aciklama | Birim |
+| Metric | Description | Unit |
 |---|---|---|
-| `drop_rate` | Paket dusme orani | % (RxDrops/RxPPS*100) |
-| `rx_errors` | Alinan hata sayisi | sayi |
-| `link_down` | Port baglanti durumu | 1=down, 0=up |
-| `cpu` | CPU kullanimi | % |
-| `memory` | RAM kullanimi | % |
+| `drop_rate` | Packet drop rate | % (RxDrops/RxPPS*100) |
+| `rx_errors` | Number of receive errors | count |
+| `link_down` | Port link status | 1=down, 0=up |
+| `cpu` | CPU usage | % |
+| `memory` | RAM usage | % |
 
-### Operatorler
-- `>` Buyukse
-- `<` Kucukse
-- `=` Esitse
+### Operators
+- `>` Greater than
+- `<` Less than
+- `=` Equal to
 
-### Zamanlama
-- Degerlendirme: **10 saniyede bir**
-- Cooldown: **5 dakika** (ayni alert tekrar tetiklenmez)
+### Timing
+- Evaluation: **every 10 seconds**
+- Cooldown: **5 minutes** (the same alert is not triggered again)
 
-### Webhook Formati
+### Webhook Format
 
 ```json
 POST <webhook_url>
@@ -591,44 +591,44 @@ Content-Type: application/json
   "time": "2026-03-29T10:30:45Z"
 }
 ```
-Timeout: 5 saniye.
+Timeout: 5 seconds.
 
 ---
 
 ## 17. Health Checks
 
-Tool output portlarini izler. Port down olursa o porta yonlendiren kurallar otomatik disable edilir.
+Monitors tool output ports. If a port goes down, the rules that route to that port are automatically disabled.
 
-| Parametre | Deger |
+| Parameter | Value |
 |---|---|
-| Kontrol araligi | 5 saniye |
-| Kaynak | `/sys/class/net/<iface>/operstate` |
-| Auto-disable | Port down → kurallar pasif |
-| Auto-enable | Port up → kurallar tekrar aktif |
+| Check interval | 5 seconds |
+| Source | `/sys/class/net/<iface>/operstate` |
+| Auto-disable | Port down → rules inactive |
+| Auto-enable | Port up → rules active again |
 
 ---
 
-## 18. Syslog / SIEM Entegrasyonu
+## 18. Syslog / SIEM Integration
 
-### RFC 5424 Formati
+### RFC 5424 Format
 
 ```
 <PRI>1 TIMESTAMP HOSTNAME APP-NAME PROCID - - MSG
 ```
 
-### Konfigürasyon
+### Configuration
 
-| Alan | Varsayilan | Aciklama |
+| Field | Default | Description |
 |---|---|---|
-| Server | - | Syslog sunucu IP/hostname |
-| Port | 514 | Hedef port |
-| Protocol | UDP | UDP veya TCP |
+| Server | - | Syslog server IP/hostname |
+| Port | 514 | Destination port |
+| Protocol | UDP | UDP or TCP |
 | Facility | LOCAL0 (16) | LOCAL0-LOCAL7 (16-23) |
-| Source Name | packet-broker | SIEM'de gorunecek isim |
+| Source Name | packet-broker | Name that will appear in the SIEM |
 
 ### Severity Mapping
 
-| Log Seviyesi | RFC 5424 Severity |
+| Log Level | RFC 5424 Severity |
 |---|---|
 | ERROR | 3 (Error) |
 | WARN | 4 (Warning) |
@@ -636,43 +636,43 @@ Tool output portlarini izler. Port down olursa o porta yonlendiren kurallar otom
 | DEBUG | 7 (Debug) |
 | Alert Events | 4 (Warning) |
 
-### Iletim Modlari
+### Forwarding Modes
 
-- **Forward Alerts:** Alert tetiklendiginde syslog'a gonder
-- **Forward Logs:** packet_broker.log'a yazilan her satiri ilet (2sn polling)
-- **Test Message:** Baglanti dogrulama icin test mesaji gonder
+- **Forward Alerts:** Send to syslog when an alert is triggered
+- **Forward Logs:** Forward every line written to packet_broker.log (2s polling)
+- **Test Message:** Send a test message to verify the connection
 
 ---
 
 ## 19. Cluster Mode
 
-### Modlar
+### Modes
 
-| Mod | Aciklama |
+| Mode | Description |
 |---|---|
-| `standalone` | Tekil cihaz (varsayilan) |
-| `controller` | Merkezi yonetim noktasi |
-| `node` | Controller'a baglanir |
+| `standalone` | Single device (default) |
+| `controller` | Central management point |
+| `node` | Connects to the controller |
 
-### Controller Davranisi
-- Node kayitlarini kabul eder (`POST /api/cluster/heartbeat`)
-- 30 saniye heartbeat gelmezse node'u "offline" isaretler
-- Her 15 saniyede kontrol yapar
+### Controller Behavior
+- Accepts node registrations (`POST /api/cluster/heartbeat`)
+- Marks a node "offline" if no heartbeat arrives for 30 seconds
+- Performs a check every 15 seconds
 
-### Node Davranisi
-- Her 10 saniyede controller'a heartbeat gonderir
-- Payload: node adi, adres, kural sayisi, broker durumu, uptime
+### Node Behavior
+- Sends a heartbeat to the controller every 10 seconds
+- Payload: node name, address, rule count, broker status, uptime
 
-### Ornek Konfigürasyon
+### Example Configuration
 
-**Controller cihaz:**
+**Controller device:**
 ```
 Mode: controller
 Node Name: master-01
 Node Address: 192.168.1.1:8005
 ```
 
-**Node cihaz:**
+**Node device:**
 ```
 Mode: node
 Node Name: broker-02
@@ -684,108 +684,108 @@ Controller URL: http://192.168.1.1:8005
 
 ## 20. Backup & Restore
 
-### Otomatik Backup
-Her kural degisikliginden once otomatik backup alinir. Son 20 auto-backup saklanir.
+### Automatic Backup
+An automatic backup is taken before every rule change. The last 20 auto-backups are retained.
 
-### Manuel Backup
-System → Backups → **Create Backup** (aciklama ile)
+### Manual Backup
+System → Backups → **Create Backup** (with a description)
 
 ### Restore
-Backup tablosundan **Restore** tiklanir. Mevcut `rules.conf` uzerine yazilir.
+Click **Restore** from the backup table. It overwrites the existing `rules.conf`.
 
 ### Import/Export
-- **Export:** ZIP dosyasi indirilir (`rules.conf` icerir)
-- **Import:** ZIP dosyasi yuklenebilir (maks 10MB)
+- **Export:** A ZIP file is downloaded (contains `rules.conf`)
+- **Import:** A ZIP file can be uploaded (max 10MB)
 
 ---
 
 ## 21. Firmware Update
 
-### Yukleme
+### Upload
 1. System → Firmware
-2. Yeni binary dosyasini sec
-3. **Upload & Replace** tikla
-4. Mevcut binary otomatik yedeklenir: `firmware_backups/packet_broker_YYYYMMDD_HHMMSS.bak`
-5. Yeni binary aktif olur
-6. **Broker'i yeniden baslat** (Stop → Start)
+2. Select the new binary file
+3. Click **Upload & Replace**
+4. The existing binary is automatically backed up: `firmware_backups/packet_broker_YYYYMMDD_HHMMSS.bak`
+5. The new binary becomes active
+6. **Restart the broker** (Stop → Start)
 
 ### Rollback
-Firmware sayfasinda eski versiyonlarin listesinden **Rollback** tikla.
+Click **Rollback** from the list of old versions on the Firmware page.
 
-### Guvenlik
-- SHA256 checksum hesaplanir ve goruntulenilir
-- Minimum 1024 byte dosya boyutu kontrolu
-- Otomatik `chmod 0755`
+### Security
+- A SHA256 checksum is computed and displayed
+- Minimum 1024-byte file size check
+- Automatic `chmod 0755`
 
 ---
 
 ## 22. Audit Log
 
-Tum onemli islemler kaydedilir:
+All important operations are recorded:
 
-| Islem | Detay |
+| Operation | Detail |
 |---|---|
-| `login` | Kullanici girisi |
-| `rule_add` | Kural ekleme |
-| `rule_delete` | Kural silme |
-| `firmware_upload` | Firmware yukleme |
-| `firmware_rollback` | Firmware geri alma |
-| `2fa_enabled` | 2FA etkinlestirme |
-| `2fa_disabled` | 2FA devre disi birakma |
+| `login` | User login |
+| `rule_add` | Rule addition |
+| `rule_delete` | Rule deletion |
+| `firmware_upload` | Firmware upload |
+| `firmware_rollback` | Firmware rollback |
+| `2fa_enabled` | 2FA enabled |
+| `2fa_disabled` | 2FA disabled |
 
-Son 5000 kayit saklanir, eski kayitlar otomatik silinir.
-System → **Audit Log** sayfasinda goruntulenilir.
+The last 5000 records are retained; older records are automatically deleted.
+Displayed on the System → **Audit Log** page.
 
 ---
 
 ## 23. Log Rotation
 
-Otomatik log dosyasi yonetimi:
+Automatic log file management:
 
-| Parametre | Deger |
+| Parameter | Value |
 |---|---|
-| Maks boyut | 10 MB |
-| Maks yedek | 5 dosya |
-| Kontrol araligi | 30 saniye |
+| Max size | 10 MB |
+| Max backups | 5 files |
+| Check interval | 30 seconds |
 
-Rotasyon sirasinda:
+During rotation:
 ```
-packet_broker.log              ← aktif (yeni bos dosya olusturulur)
-packet_broker.log.20260329_103045  ← yedek
-packet_broker.log.20260328_142200  ← yedek
+packet_broker.log              ← active (a new empty file is created)
+packet_broker.log.20260329_103045  ← backup
+packet_broker.log.20260328_142200  ← backup
 ...
 ```
 
 ---
 
-## 24. Tema (Dark/Light)
+## 24. Theme (Dark/Light)
 
-Sidebar'daki kullanici bolumunde gunes/ay ikonuna tiklayarak degistirilebilir.
+Can be changed by clicking the sun/moon icon in the user section of the sidebar.
 
-- **Dark** (varsayilan): GitHub dark renk paleti (#0d1117 arka plan)
-- **Light**: Acik tema (#f6f8fa arka plan)
-- `localStorage`'da saklanir, sayfa yenilemede korunur
-- CSS Custom Properties ile tek seferde tum renkler degisir
+- **Dark** (default): GitHub dark color palette (#0d1117 background)
+- **Light**: Light theme (#f6f8fa background)
+- Stored in `localStorage`, preserved across page reloads
+- All colors change at once via CSS Custom Properties
 
 ---
 
-## 25. JSON API Referansi
+## 25. JSON API Reference
 
-Tum API endpoint'leri oturum dogrulamasi gerektirir (cookie). Cluster heartbeat haric.
+All API endpoints require session authentication (cookie). Except the cluster heartbeat.
 
-| Method | Endpoint | Aciklama |
+| Method | Endpoint | Description |
 |---|---|---|
-| GET | `/api/stats` | Port istatistikleri + rates |
-| GET | `/api/stats/sparkline` | 60 noktali sparkline verisi |
+| GET | `/api/stats` | Port statistics + rates |
+| GET | `/api/stats/sparkline` | 60-point sparkline data |
 | GET | `/api/system` | CPU%, memory%, uptime |
-| GET | `/api/traffic/24h` | 24 saatlik trafik gecmisi |
-| GET | `/api/captures` | Capture oturumlari |
-| GET | `/api/alerts/events` | Alert olaylari + unacked sayisi |
-| GET | `/api/backups` | Backup listesi |
-| GET | `/api/cluster/nodes` | Cluster node listesi |
-| POST | `/api/cluster/heartbeat` | Node heartbeat (auth gerektirmez) |
+| GET | `/api/traffic/24h` | 24-hour traffic history |
+| GET | `/api/captures` | Capture sessions |
+| GET | `/api/alerts/events` | Alert events + unacked count |
+| GET | `/api/backups` | Backup list |
+| GET | `/api/cluster/nodes` | Cluster node list |
+| POST | `/api/cluster/heartbeat` | Node heartbeat (does not require auth) |
 
-### Ornek Response: `/api/stats`
+### Example Response: `/api/stats`
 
 ```json
 {
@@ -802,7 +802,7 @@ Tum API endpoint'leri oturum dogrulamasi gerektirir (cookie). Cluster heartbeat 
 }
 ```
 
-### Ornek Response: `/api/system`
+### Example Response: `/api/system`
 
 ```json
 {
@@ -816,20 +816,20 @@ Tum API endpoint'leri oturum dogrulamasi gerektirir (cookie). Cluster heartbeat 
 
 ---
 
-## 26. Konfigürasyon Dosyalari
+## 26. Configuration Files
 
-| Dosya | Aciklama | Olusturan |
+| File | Description | Created by |
 |---|---|---|
-| `rules.conf` | C binary kural dosyasi (22 alan CSV) | Go UI |
-| `rules_state.json` | Tam kural state'i (JSON) | Go UI |
-| `users.db` | SQLite veritabani | Go UI |
-| `license.key` | Imzalanmis lisans dosyasi | keygen CLI |
-| `dedup.conf` | Dedup konfigürasyonu | Go UI |
-| `packet_broker.log` | Uygulama + C binary logu | Her ikisi |
-| `packet_broker.status` | "running" veya "stopped" | C binary |
+| `rules.conf` | C binary rule file (22-field CSV) | Go UI |
+| `rules_state.json` | Full rule state (JSON) | Go UI |
+| `users.db` | SQLite database | Go UI |
+| `license.key` | Signed license file | keygen CLI |
+| `dedup.conf` | Dedup configuration | Go UI |
+| `packet_broker.log` | Application + C binary log | Both |
+| `packet_broker.status` | "running" or "stopped" | C binary |
 | `packet_broker.pid` | C binary PID | C binary |
 
-### SQLite Tablolari (`users.db`)
+### SQLite Tables (`users.db`)
 
 ```
 users, totp_secrets, alert_rules, alert_events,
@@ -841,147 +841,147 @@ health_checks, auto_disabled_rules, audit_log
 
 ---
 
-## 27. C Binary Teknik Detay
+## 27. C Binary Technical Details
 
-### Sabitler
+### Constants
 
-| Sabit | Deger | Aciklama |
+| Constant | Value | Description |
 |---|---|---|
-| `MAX_RULES` | 256 | Maks kural sayisi |
-| `MAX_INTERFACES` | 48 | Maks interface sayisi |
-| `SNAP_LEN` | 65535 | Maks paket yakalama boyutu |
-| `DEDUP_TABLE_SIZE` | 65536 | Hash tablosu boyutu (2^16) |
-| `STATS_INTERVAL` | 5 sn | Istatistik log araligi |
+| `MAX_RULES` | 256 | Max number of rules |
+| `MAX_INTERFACES` | 48 | Max number of interfaces |
+| `SNAP_LEN` | 65535 | Max packet capture size |
+| `DEDUP_TABLE_SIZE` | 65536 | Hash table size (2^16) |
+| `STATS_INTERVAL` | 5 s | Statistics log interval |
 
 ### Threading (libpcap)
 
-- Her input interface icin ayri pthread
-- `rules_lock` mutex ile kural erisimi
-- `dedup_lock` mutex ile dedup tablosu erisimi
-- Stats thread: her 5 saniyede per-rule istatistikleri loglar
+- A separate pthread for each input interface
+- Rule access via the `rules_lock` mutex
+- Dedup table access via the `dedup_lock` mutex
+- Stats thread: logs per-rule statistics every 5 seconds
 
-### Kural Eslestirme Sirasi
+### Rule Matching Order
 
-1. Interface eslesmesi (`iface_in`)
-2. MAC filtresi (dst, src)
-3. VLAN ID filtresi
-4. IP filtresi (src CIDR, dst CIDR)
-5. Protokol filtresi (TCP/UDP/ICMP)
-6. Port filtresi (TCP/UDP dest port)
-7. TCP bayrak filtresi
-8. String eslesmesi (payload'da memmem)
-9. Exclude inversiyonu
-10. Rate limit kontrolu (token bucket)
-11. VLAN manipulasyonu (add/remove/change)
+1. Interface match (`iface_in`)
+2. MAC filter (dst, src)
+3. VLAN ID filter
+4. IP filter (src CIDR, dst CIDR)
+5. Protocol filter (TCP/UDP/ICMP)
+6. Port filter (TCP/UDP dest port)
+7. TCP flag filter
+8. String match (memmem in the payload)
+9. Exclude inversion
+10. Rate limit check (token bucket)
+11. VLAN manipulation (add/remove/change)
 12. Truncation
 13. Forward (pcap_inject)
 
 ---
 
-## 28. Guvenlik Notlari
+## 28. Security Notes
 
-1. **HTTPS kullanin:** Production'da reverse proxy (nginx/caddy) ile TLS ekleyin
-2. **Varsayilan sifreyi degistirin:** admin/admin ile ilk giriste uyari gorunur
-3. **2FA etkinlestirin:** Admin hesaplar icin ozellikle onerilir
-4. **Rate limiting aktif:** 5 basarisiz giris/dakika/IP
-5. **CSRF korumasi:** Tum POST isteklerinde token dogrulamasi
-6. **HttpOnly + SameSite=Strict cookie:** XSS ve CSRF'e karsi
-7. **Audit log:** Tum degisiklikler kaydedilir
-8. **Lisans dogrulamasi:** Ed25519 imza, hardware kilidi
+1. **Use HTTPS:** In production, add TLS with a reverse proxy (nginx/caddy)
+2. **Change the default password:** A warning appears on the first login with admin/admin
+3. **Enable 2FA:** Especially recommended for admin accounts
+4. **Rate limiting active:** 5 failed logins/minute/IP
+5. **CSRF protection:** Token validation on all POST requests
+6. **HttpOnly + SameSite=Strict cookie:** Against XSS and CSRF
+7. **Audit log:** All changes are recorded
+8. **License validation:** Ed25519 signature, hardware lock
 
 ---
 
 ## 29. Troubleshooting
 
-### Web UI baslamiyorsa
+### If the Web UI does not start
 
 ```bash
-# Port kullanimda mi?
+# Is the port in use?
 lsof -i :8005
 
-# Template dosyalari yerinde mi?
+# Are the template files in place?
 ls templates/*.html
 
-# Log kontrol
+# Check the log
 tail -f packet_broker.log
 ```
 
-### C binary baslamiyorsa
+### If the C binary does not start
 
 ```bash
-# Binary izinleri
+# Binary permissions
 chmod +x packet_broker
 
-# libpcap yuklu mu?
+# Is libpcap installed?
 ldconfig -p | grep libpcap
 
-# Interface var mi?
+# Does the interface exist?
 ip link show
 ```
 
-### Kurallar calismiyorsa
+### If rules do not work
 
 ```bash
-# rules.conf icerigini kontrol et
+# Check the contents of rules.conf
 cat rules.conf
 
-# C binary logu
+# C binary log
 grep "Loaded" packet_broker.log
 grep "Rule" packet_broker.log
 ```
 
-### License hatalari
+### License errors
 
 ```bash
-# Hardware ID kontrol
+# Check the Hardware ID
 go run cmd/keygen/main.go -hwid
 
-# License dosya formati kontrol
+# Check the license file format
 cat license.key | python3 -m json.tool
 ```
 
 ---
 
-## 30. Gelistirici Referansi
+## 30. Developer Reference
 
-### Proje Yapisi
+### Project Structure
 
 ```
 packet_broker/
-├── main.go                     # 1400+ satir, tum handler'lar ve routing
-├── go.mod                      # Go modül tanimı
-├── internal/                   # 22 Go paketi
-├── templates/                  # 20+ HTML template
-├── c_src/                      # 2 C binary (libpcap + DPDK)
-├── cmd/keygen/                 # Lisans anahtar araci
+├── main.go                     # 1400+ lines, all handlers and routing
+├── go.mod                      # Go module definition
+├── internal/                   # 22 Go packages
+├── templates/                  # 20+ HTML templates
+├── c_src/                      # 2 C binaries (libpcap + DPDK)
+├── cmd/keygen/                 # License key tool
 ├── deploy/                     # Systemd service
-├── captures/                   # PCAP dosyalari (runtime)
-├── firmware_backups/           # Eski binary yedekleri (runtime)
-└── old/                        # Arsivlenmis Python kodu
+├── captures/                   # PCAP files (runtime)
+├── firmware_backups/           # Old binary backups (runtime)
+└── old/                        # Archived Python code
 ```
 
-### Yeni Paket Ekleme Adimlari
+### Steps to Add a New Package
 
-1. `internal/yenipaket/yenipaket.go` olustur (Store struct + New constructor)
-2. `main.go`'da import ekle
-3. App struct'a alan ekle
-4. PageData struct'a gerekli alanlar ekle
-5. Handler fonksiyonlari yaz
-6. `main()` icinde init (New() cagir, App'e ata)
-7. Route'lar ekle (mux.HandleFunc)
-8. Template olustur (`templates/yenipaket.html`)
-9. `layout.html` sidebar'a nav-item ekle
-10. `go build ./...` ile dogrula
+1. Create `internal/yenipaket/yenipaket.go` (Store struct + New constructor)
+2. Add the import in `main.go`
+3. Add a field to the App struct
+4. Add the necessary fields to the PageData struct
+5. Write the handler functions
+6. Initialize inside `main()` (call New(), assign to App)
+7. Add routes (mux.HandleFunc)
+8. Create the template (`templates/yenipaket.html`)
+9. Add a nav-item to the `layout.html` sidebar
+10. Verify with `go build ./...`
 
-### Middleware Zinciri
+### Middleware Chain
 
 ```
 Client → securityHeaders → requireAuth → requireCSRF → mux → handler
 ```
 
-### Template Sistemi
+### Template System
 
-- `{{template "header" .}}` ve `{{template "footer" .}}` ile layout
-- Tum sayfalar PageData struct alir
-- `login.html` ayri template set (layout'tan bagimsiz)
-- Template fonksiyonlari: `add`, `sub`, `mul`, `min`, `fmtBytes`, `join`
+- Layout via `{{template "header" .}}` and `{{template "footer" .}}`
+- All pages receive a PageData struct
+- `login.html` is a separate template set (independent of the layout)
+- Template functions: `add`, `sub`, `mul`, `min`, `fmtBytes`, `join`
