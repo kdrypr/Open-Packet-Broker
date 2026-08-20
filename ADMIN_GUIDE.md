@@ -146,6 +146,50 @@ File: `/etc/systemd/system/packet-broker.service`
 | `ProtectSystem` | `strict` | Only ReadWritePaths are writable |
 | `NoNewPrivileges` | `true` | Privilege escalation is blocked |
 
+### Starting the Data Plane Automatically
+
+The systemd unit starts the **control plane** (the web UI). The **data plane**
+(the `packet_broker` C binary) is a child process the control plane spawns, so
+`systemctl enable packet-broker` alone does not bring capture up after a reboot.
+
+The policy is set in the UI under **Settings → Data Plane Auto-Start**:
+
+| Policy | Behaviour on control-plane start |
+|---|---|
+| `off` | Never start the data plane — use the dashboard's Start button |
+| `restore` | **(default)** Start it if it was running before the last shutdown |
+| `always` | Start it on every boot, and restart it within ~15 s if it dies |
+
+`restore` follows the operator's last explicit Start/Stop, which is stored in
+the appliance database and therefore survives reboots, upgrades and backup
+restores. A freshly installed appliance has never been started, so nothing
+starts until the first Start.
+
+`always` additionally supervises the data plane: if the process exits (crash,
+OOM kill) it is restarted, with an exponential back-off up to 5 minutes so a
+data plane that cannot start — missing NIC, no `CAP_NET_RAW` — does not spin.
+Pressing **Stop** in the UI stops the supervisor as well; it never fights the
+operator.
+
+To pin the policy from the unit file instead (appliance images, config
+management), set `PB_AUTOSTART` — it overrides the UI setting, which is then
+shown as read-only:
+
+```ini
+# /etc/systemd/system/packet-broker.service
+Environment=PB_AUTOSTART=always      # off | restore | always
+```
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl restart packet-broker
+grep -E 'auto-start|supervisor' /opt/packet-broker/packet_broker.log
+```
+
+> **Note:** start-up also reconciles `packet_broker.status` / `packet_broker.pid`
+> with reality. Before this, a hard reboot left the status file saying `running`,
+> so the dashboard showed a green pill for a data plane that no longer existed
+> (and the Stop button could signal whichever process had inherited the PID).
+
 ---
 
 ## 4. User Management & Roles

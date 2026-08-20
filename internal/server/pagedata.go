@@ -134,6 +134,10 @@ type PageData struct {
 	// appliance settings (branding + identity)
 	AppConfig appcfg.Config
 
+	// data-plane auto-start (settings page)
+	AutoStart       string // effective policy: off | restore | always
+	AutoStartLocked bool   // true when PB_AUTOSTART overrides the stored setting
+
 	// theme
 	Theme string
 

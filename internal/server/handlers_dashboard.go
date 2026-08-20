@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 
+	"packet_broker/internal/appcfg"
 	"packet_broker/internal/logs"
 )
 
@@ -57,6 +58,8 @@ func (a *App) handleStart(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Start failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// Record the intent so a reboot can restore it (see applyAutoStart).
+	a.setDesiredState(appcfg.StateRunning)
 	a.info("Broker started. PID=" + strconv.Itoa(a.broker.PID()))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -72,6 +75,9 @@ func (a *App) handleStop(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Stop failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// An explicit stop must survive a reboot, and stops the supervisor from
+	// restarting the data plane behind the operator's back.
+	a.setDesiredState(appcfg.StateStopped)
 	a.info("Broker stopped. PID=" + strconv.Itoa(pid))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

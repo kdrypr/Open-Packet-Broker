@@ -18,6 +18,7 @@ import (
 	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strconv"
 	"strings"
@@ -99,13 +100,152 @@ func (m *Manager) DataPlaneIfaces() []string {
 	return netifaces.DataPlane()
 }
 
-// Status returns "running" or "stopped" by reading packet_broker.status.
+// Status returns "running" or "stopped".
+//
+// The status file alone cannot be trusted: it is written by Start/Stop and by
+// the data plane itself, so a crash, an OOM kill or a host reboot leaves it
+// saying "running" with nothing behind it — the dashboard then shows a green
+// pill for a data plane that is dropping every packet. A "running" claim is
+// therefore confirmed against the process, and a stale claim is corrected on
+// the spot so the UI, the cluster heartbeat and the Start/Stop buttons all
+// agree with reality.
 func (m *Manager) Status() string {
 	data, err := os.ReadFile(m.StatusPath)
-	if err != nil {
+	if err != nil || strings.TrimSpace(string(data)) != "running" {
 		return "stopped"
 	}
-	return strings.TrimSpace(string(data))
+	if m.Running() {
+		return "running"
+	}
+	m.markStopped()
+	return "stopped"
+}
+
+// markStopped records "stopped" and drops the PID file, which is no longer
+// naming anything of ours.
+func (m *Manager) markStopped() {
+	_ = os.Remove(m.PidPath)
+	_ = os.WriteFile(m.StatusPath, []byte("stopped"), 0600)
+}
+
+// Running reports whether the data-plane process is actually alive right now,
+// as opposed to what the status file claims.
+func (m *Manager) Running() bool {
+	return m.ownsProcess(m.PID())
+}
+
+// Reconcile makes the recorded status agree with reality and reports whether
+// the data plane is running. It exists because the status/PID files survive
+// events the process does not: a hard reboot or an OOM kill leaves
+// packet_broker.status saying "running" with nothing behind it, so the UI shows
+// a green pill for a data plane that is dropping every packet.
+//
+// Call it once at control-plane start-up, before applying the auto-start policy.
+func (m *Manager) Reconcile() bool {
+	if m.Running() {
+		_ = os.WriteFile(m.StatusPath, []byte("running"), 0600)
+		return true
+	}
+	m.markStopped()
+	return false
+}
+
+// ownsProcess reports whether pid is alive *and* is one of our data-plane
+// binaries. The identity check matters after a reboot: PIDs are reused from a
+// low number on every boot, so a bare kill(pid, 0) on a stale PID file happily
+// reports "running" — and would let Stop send SIGTERM to an unrelated process.
+//
+// It is deliberately conservative: only a *proven* mismatch (we could read the
+// process's executable or name and it isn't ours) returns false. When /proc is
+// unreadable — non-Linux, a hardened container — an alive PID is assumed ours,
+// which keeps Stop working at the cost of not detecting reuse.
+func (m *Manager) ownsProcess(pid int) bool {
+	if pid <= 0 {
+		return false
+	}
+	proc, err := os.FindProcess(pid)
+	if err != nil {
+		return false
+	}
+	if proc.Signal(syscall.Signal(0)) != nil {
+		return false // no such process (or not ours to signal)
+	}
+	if runtime.GOOS != "linux" {
+		return true
+	}
+	procDir := "/proc/" + strconv.Itoa(pid)
+	if isZombie(procDir) {
+		return false // exited, just not reaped yet
+	}
+	if exe, err := os.Readlink(procDir + "/exe"); err == nil {
+		return m.isBrokerPath(exe)
+	}
+	// No /proc/<pid>/exe (permissions): fall back to the process name. Note
+	// /proc/<pid>/comm is truncated to 15 chars, hence the prefix compare.
+	comm, err := os.ReadFile(procDir + "/comm")
+	if err != nil {
+		return true // can't tell — treat an alive PID as ours
+	}
+	return m.isBrokerName(strings.TrimSpace(string(comm)))
+}
+
+// isBrokerPath reports whether an executable path is one of our data-plane
+// binaries, comparing resolved paths so a symlinked deployment dir still matches.
+func (m *Manager) isBrokerPath(exe string) bool {
+	exe = strings.TrimSuffix(exe, " (deleted)") // binary replaced by an upgrade
+	resolved := exe
+	if r, err := filepath.EvalSymlinks(exe); err == nil {
+		resolved = r
+	}
+	for _, p := range m.binPaths() {
+		if p == exe || p == resolved {
+			return true
+		}
+		if r, err := filepath.EvalSymlinks(p); err == nil && (r == exe || r == resolved) {
+			return true
+		}
+	}
+	return m.isBrokerName(filepath.Base(exe))
+}
+
+// isBrokerName reports whether a process name matches one of our binaries,
+// tolerating the 15-char truncation of /proc/<pid>/comm.
+func (m *Manager) isBrokerName(name string) bool {
+	const commMax = 15 // TASK_COMM_LEN - 1
+	for _, p := range m.binPaths() {
+		base := filepath.Base(p)
+		if name == base || (len(base) > commMax && name == base[:commMax]) {
+			return true
+		}
+	}
+	return false
+}
+
+// isZombie reports whether the process behind procDir has exited but not been
+// reaped. Its state is the third field of /proc/<pid>/stat, which is parsed
+// from the last ")" because the second field (the comm) can itself contain
+// spaces and parentheses.
+func isZombie(procDir string) bool {
+	stat, err := os.ReadFile(procDir + "/stat")
+	if err != nil {
+		return false
+	}
+	i := strings.LastIndex(string(stat), ")")
+	if i < 0 {
+		return false
+	}
+	fields := strings.Fields(string(stat)[i+1:])
+	return len(fields) > 0 && fields[0] == "Z"
+}
+
+func (m *Manager) binPaths() []string {
+	out := make([]string, 0, 3)
+	for _, p := range []string{m.BinPath, m.AFXDPPath, m.DPDKPath} {
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
 }
 
 // Start launches the broker binary as a detached process.
@@ -189,6 +329,10 @@ func (m *Manager) spawn(bin string, args, env []string) (int, error) {
 	if err := cmd.Start(); err != nil {
 		return 0, err
 	}
+	// Reap the child when it exits. Without this it lingers as a zombie for as
+	// long as the UI runs, and a zombie answers kill(pid, 0) — so a dead data
+	// plane would still look alive to Status/Stop/the supervisor.
+	go func() { _ = cmd.Wait() }()
 	return cmd.Process.Pid, nil
 }
 
@@ -221,6 +365,9 @@ func (m *Manager) Stop() error {
 	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
 	if err != nil || pid <= 0 {
 		return nil
+	}
+	if !m.ownsProcess(pid) {
+		return nil // stale PID file (host rebooted / process already gone)
 	}
 	proc, err := os.FindProcess(pid)
 	if err != nil {

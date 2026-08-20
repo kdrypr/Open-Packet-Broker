@@ -1,5 +1,5 @@
 {{template "header" .}}
-<div class="page-hdr"><div><h1 class="page-title">Appliance Settings</h1><p class="page-sub">Branding &amp; identity, TLS certificate, FQDN</p></div></div>
+<div class="page-hdr"><div><h1 class="page-title">Appliance Settings</h1><p class="page-sub">Branding &amp; identity, data-plane auto-start, TLS certificate, FQDN</p></div></div>
 
 {{if .FlashError}}<div style="background:rgba(248,81,73,0.1);border:1px solid rgba(248,81,73,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#f85149">{{.FlashError}}</div>{{end}}
 {{if .FlashSuccess}}<div style="background:rgba(63,185,80,0.1);border:1px solid rgba(63,185,80,0.3);border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:13px;color:#3fb950">{{.FlashSuccess}}</div>{{end}}
@@ -40,6 +40,26 @@
     </form>
     {{end}}
     <p style="font-size:11px;color:var(--text-muted);margin:8px 0 0">PNG, JPEG, GIF or ICO · max 1 MB · SVG not allowed.</p>
+  </div>
+
+  <!-- Data plane -->
+  <div class="card" style="padding:18px">
+    <h2 style="font-size:15px;margin:0 0 4px">Data Plane Auto-Start</h2>
+    <p style="font-size:12px;color:var(--text-muted);margin:0 0 14px">The control plane starts with systemd; this decides what happens to the packet broker (data plane) process at that point.</p>
+    <form method="post" action="/admin/settings/autostart">
+      <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+      <label style="display:block;font-size:12px;font-weight:600;margin-bottom:4px">On control-plane start</label>
+      <select name="auto_start"
+              style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--border);background:var(--bg);color:var(--text);font-size:13px;margin-bottom:6px">
+        <option value="off"{{if eq .AppConfig.AutoStart "off"}} selected{{end}}>Off — start it manually from the dashboard</option>
+        <option value="restore"{{if eq .AppConfig.AutoStart "restore"}} selected{{end}}>Restore — start it if it was running before the last shutdown</option>
+        <option value="always"{{if eq .AppConfig.AutoStart "always"}} selected{{end}}>Always — start it on boot and restart it if it dies</option>
+      </select>
+      <p style="font-size:11px;color:var(--text-muted);margin:0 0 12px">
+        Currently effective: <strong>{{.AutoStart}}</strong>{{if .AutoStartLocked}} — pinned by the <code>PB_AUTOSTART</code> environment variable, so this setting is ignored until it is removed from the systemd unit.{{end}}
+      </p>
+      <button class="btn btn-primary" type="submit">Save auto-start</button>
+    </form>
   </div>
 
   <!-- TLS -->
