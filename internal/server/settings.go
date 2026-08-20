@@ -28,6 +28,8 @@ func (a *App) handleGuide(w http.ResponseWriter, r *http.Request) {
 func (a *App) handleSettings(w http.ResponseWriter, r *http.Request) {
 	data := a.baseData(r, "settings")
 	data.AppConfig = a.appCfg.Get()
+	data.AutoStart = a.autoStartPolicy()
+	data.AutoStartLocked = a.autoStartLocked()
 	data.FlashError = r.URL.Query().Get("error")
 	data.FlashSuccess = r.URL.Query().Get("success")
 	a.render(w, "settings.html", data)

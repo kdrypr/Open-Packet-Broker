@@ -21,6 +21,16 @@ PrivateTmp=true
 
 # Environment
 Environment=GOMAXPROCS=4
+# Data-plane auto-start. Optional: without it the policy configured in the UI
+# (Settings -> Data Plane Auto-Start) applies, which defaults to "restore" —
+# the data plane comes back up if it was running before the last shutdown.
+# Uncomment to pin the behaviour from the unit instead:
+#   off      never start the data plane automatically
+#   restore  start it if it was running before the last shutdown
+#   always   start it on every boot, and restart it if it dies
+#Environment=PB_AUTOSTART=always
+# Data-plane backend: libpcap (default) | afxdp | dpdk
+#Environment=BROKER_MODE=afxdp
 
 [Install]
 WantedBy=multi-user.target

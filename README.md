@@ -111,6 +111,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now packet-broker
 ```
 
+The unit starts the control plane (web UI); the data plane is a child process it
+spawns. **Settings → Data Plane Auto-Start** decides what happens to it at that
+point — `off`, `restore` (default: come back up if it was running before the
+last shutdown) or `always` (start on every boot and restart it if it dies). Set
+`Environment=PB_AUTOSTART=always` in the unit to pin the policy from systemd
+instead. See [ADMIN_GUIDE.md](ADMIN_GUIDE.md#3-production-deployment-with-systemd).
+
 ## Project Layout
 
 ```

@@ -95,6 +95,14 @@ type App struct {
 	defAdminVal     bool
 	defAdminAt      time.Time
 	defAdminLatched bool // once secured it can't revert without a restart
+
+	// autoStop closes on shutdown to stop the data-plane supervisor. It is
+	// never reassigned after construction (the supervisor reads it on every
+	// loop), so shutdown closes it exactly once via autoStopOnce.
+	autoStop     chan struct{}
+	autoStopOnce sync.Once
+	superviseMu  sync.Mutex
+	supervising  bool
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +190,27 @@ func Run() {
 		log.Fatalf("startup: %v", err)
 	}
 	app.serve()
+}
+
+// templateFuncs is the helper set every page template is parsed with. It lives
+// outside newApp so tests can render the real templates.
+func templateFuncs() template.FuncMap {
+	return template.FuncMap{
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
+		"mul": func(a, b int) int { return a * b },
+		"min": func(a, b int) int {
+			if a < b {
+				return a
+			}
+			return b
+		},
+		"fmtBytes":  func(b uint64) string { return fmtBytes(b) },
+		"join":      strings.Join,
+		"hasPrefix": strings.HasPrefix,
+		"gaugeArc":  func(pct float64) float64 { return pct / 100 * 125.66 },
+		"t":         func(lang, key string) string { return i18n.Translate(lang, key) },
+	}
 }
 
 // newApp wires every subsystem store and returns a ready App. It returns an
@@ -398,24 +427,8 @@ func newApp(rootDir string) (*App, error) {
 	}
 
 	// Templates
-	funcs := template.FuncMap{
-		"add": func(a, b int) int { return a + b },
-		"sub": func(a, b int) int { return a - b },
-		"mul": func(a, b int) int { return a * b },
-		"min": func(a, b int) int {
-			if a < b {
-				return a
-			}
-			return b
-		},
-		"fmtBytes":  func(b uint64) string { return fmtBytes(b) },
-		"join":      strings.Join,
-		"hasPrefix": strings.HasPrefix,
-		"gaugeArc":  func(pct float64) float64 { return pct / 100 * 125.66 },
-		"t":         func(lang, key string) string { return i18n.Translate(lang, key) },
-	}
 	tmplDir := filepath.Join(rootDir, "templates")
-	mainTmpl := template.Must(template.New("").Funcs(funcs).ParseGlob(filepath.Join(tmplDir, "*.html")))
+	mainTmpl := template.Must(template.New("").Funcs(templateFuncs()).ParseGlob(filepath.Join(tmplDir, "*.html")))
 	loginTmpl := template.Must(template.New("").ParseFiles(filepath.Join(tmplDir, "login.html")))
 
 	// Data plane mode is fixed per-process via BROKER_MODE env var.
@@ -469,6 +482,7 @@ func newApp(rootDir string) (*App, error) {
 		loginTmpl:    loginTmpl,
 		logger:       logger,
 		slog:         sl,
+		autoStop:     make(chan struct{}),
 	}
 
 	// Health checks
@@ -623,6 +637,7 @@ func (a *App) routes() http.Handler {
 	mux.HandleFunc("POST /admin/settings/logo/clear", a.adminOnly(a.handleLogoClear))
 	mux.HandleFunc("POST /admin/settings/tls", a.adminOnly(a.handleTLSUpload))
 	mux.HandleFunc("POST /admin/settings/tls/regen", a.adminOnly(a.handleTLSRegen))
+	mux.HandleFunc("POST /admin/settings/autostart", a.adminOnly(a.handleAutoStartSave))
 	// Administration guide (in-product HTML)
 	mux.HandleFunc("GET /admin/guide", a.handleGuide)
 	// Public branding asset (logo) — pre-auth so the login page can show it.
@@ -677,6 +692,11 @@ func (a *App) serve() {
 	a.clusterMgr.Start()
 	stopTailer := a.syslogStore.StartTailer(a.logPath)
 	handler := a.routes()
+
+	// Bring the data plane up per the auto-start policy. Without this the
+	// broker stays stopped after a reboot until someone opens the UI and
+	// presses Start.
+	a.applyAutoStart()
 
 	// TLS setup
 	certPath := filepath.Join(a.rootDir, "cert.pem")
@@ -793,6 +813,11 @@ func (a *App) shutdown(stopTailer func()) {
 	}
 	if a.logRotator != nil {
 		a.logRotator.Stop()
+	}
+	if a.autoStop != nil {
+		// Stop the supervisor first, so it can't restart the data plane
+		// between here and broker.Stop below.
+		a.autoStopOnce.Do(func() { close(a.autoStop) })
 	}
 	if a.broker != nil {
 		_ = a.broker.Stop()
